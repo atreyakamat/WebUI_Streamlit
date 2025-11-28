@@ -1,0 +1,2 @@
+streamlit>=1.38.0
+markdown>=3.6
