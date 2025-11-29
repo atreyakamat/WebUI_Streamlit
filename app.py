@@ -7,7 +7,7 @@ import json
 import time
 import uuid
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -60,6 +60,86 @@ DEFAULT_UI_STATE: Dict[str, object] = {
 }
 
 
+def create_thread(title: str = "New chat") -> Dict[str, Any]:
+    return {
+        "id": str(uuid.uuid4()),
+        "title": title,
+        "created": datetime.utcnow().isoformat(),
+        "messages": [],
+    }
+
+
+def get_active_thread() -> Optional[Dict[str, Any]]:
+    active_id = st.session_state.get("active_thread_id")
+    for thread in st.session_state.get("chat_threads", []):
+        if thread.get("id") == active_id:
+            return thread
+    return None
+
+
+def sync_active_messages() -> None:
+    active = get_active_thread()
+    if not active:
+        return
+    if st.session_state.get("messages") is not active.get("messages"):
+        st.session_state.messages = active.get("messages", [])
+
+
+def ensure_chat_threads() -> None:
+    threads: List[Dict[str, Any]] = st.session_state.setdefault("chat_threads", [])
+    if not threads:
+        initial_thread = create_thread()
+        initial_thread["messages"] = st.session_state.get("messages", [])
+        threads.append(initial_thread)
+    st.session_state.setdefault("active_thread_id", threads[0]["id"])
+    sync_active_messages()
+
+
+def start_new_thread() -> None:
+    thread = create_thread()
+    st.session_state.chat_threads.insert(0, thread)
+    st.session_state.active_thread_id = thread["id"]
+    st.session_state.messages = thread["messages"]
+
+
+def switch_thread(thread_id: str) -> None:
+    if thread_id == st.session_state.get("active_thread_id"):
+        return
+    current = get_active_thread()
+    if current is not None:
+        current["messages"] = st.session_state.get("messages", [])
+    st.session_state.active_thread_id = thread_id
+    target = get_active_thread()
+    if not target:
+        target = create_thread()
+        st.session_state.chat_threads.append(target)
+        st.session_state.active_thread_id = target["id"]
+    st.session_state.messages = target.get("messages", [])
+
+
+def derive_thread_title(thread: Dict[str, Any]) -> str:
+    existing = thread.get("title") or "New chat"
+    messages: List[Dict[str, str]] = thread.get("messages", [])
+    for message in messages:
+        if message.get("role") == "user" and message.get("content"):
+            snippet = message["content"].splitlines()[0]
+            if len(snippet) > 36:
+                snippet = snippet[:33] + "..."
+            thread["title"] = snippet or existing
+            return thread["title"]
+    return existing
+
+
+def refresh_active_thread_title() -> None:
+    thread = get_active_thread()
+    if not thread:
+        return
+    if thread.get("messages"):
+        derive_thread_title(thread)
+    else:
+        thread["title"] = "New chat"
+
+
 def init_session_state() -> None:
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -68,6 +148,7 @@ def init_session_state() -> None:
     else:
         for key, value in DEFAULT_UI_STATE.items():
             st.session_state.ui.setdefault(key, value)
+    ensure_chat_threads()
 
 
 def create_message(role: str, content: str) -> Dict[str, str]:
@@ -130,6 +211,37 @@ def inject_global_styles(theme: Dict[str, str]) -> None:
         font-size: 2rem;
         margin: 0;
         letter-spacing: -0.01em;
+    }}
+    .history-label {{
+        margin: 1rem 0 0.3rem;
+        font-size: 0.78rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        opacity: 0.75;
+    }}
+    .history-button-group {{
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+    }}
+    .history-button-group button {{
+        justify-content: flex-start;
+        border-radius: 0.9rem;
+        border: 1px solid var(--border-color);
+        background: rgba(255, 255, 255, 0.02);
+        color: inherit;
+        font-weight: 500;
+        transition: border 0.2s ease, background 0.2s ease;
+        padding: 0.35rem 0.9rem;
+    }}
+    .history-button-group button:hover {{
+        border-color: rgba(32, 201, 151, 0.7);
+        background: rgba(32, 201, 151, 0.08);
+    }}
+    .history-button-group button:disabled {{
+        border-color: #20c997;
+        color: #20c997;
+        background: rgba(32, 201, 151, 0.12);
     }}
     .chat-feed {{
         width: 100%;
@@ -249,6 +361,27 @@ def inject_global_styles(theme: Dict[str, str]) -> None:
         box-shadow: 0 18px 40px -28px rgba(0, 0, 0, 0.8);
         backdrop-filter: blur(18px);
         width: min(620px, 100%);
+    }}
+    [data-testid="stSidebar"] {{
+        position: relative;
+    }}
+    .sidebar-gear-space {{
+        height: 2rem;
+    }}
+    .sidebar-gear {{
+        position: fixed;
+        left: 1rem;
+        top: 8rem;
+        z-index: 200;
+    }}
+    .sidebar-gear button {{
+        width: 46px;
+        height: 46px;
+        border-radius: 999px;
+        border: 1px solid var(--border-color);
+        background: var(--surface);
+        font-size: 1.2rem;
+        box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.6);
     }}
     @keyframes floatIn {{
         from {{
@@ -513,11 +646,16 @@ def export_payloads() -> Dict[str, str]:
 
 
 def reset_conversation() -> None:
-    st.session_state.messages = []
+    start_new_thread()
 
 
 def clear_messages() -> None:
-    st.session_state.messages = []
+    fresh: List[Dict[str, str]] = []
+    st.session_state.messages = fresh
+    thread = get_active_thread()
+    if thread:
+        thread["messages"] = fresh
+        thread["title"] = "New chat"
 
 
 def quick_settings_panel() -> None:
@@ -550,94 +688,72 @@ def quick_settings_panel() -> None:
 
 def sidebar_actions(json_payload: str) -> None:
     with st.sidebar:
-        st.header("Chat Actions")
-        st.caption("Manage this conversation from a single place.")
-        if st.button("Clear chat", use_container_width=True):
-            clear_messages()
-            st.rerun()
-        if st.button("New chat", use_container_width=True):
+        with st.container():
+            st.markdown('<div class="sidebar-gear">', unsafe_allow_html=True)
+            if st.button("⚙️", key="gear-settings-btn"):
+                st.session_state.ui["show_quick_settings"] = not st.session_state.ui.get("show_quick_settings", False)
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+        st.subheader("Conversations")
+        if st.button("➕ New chat", use_container_width=True, key="new-chat-btn"):
             reset_conversation()
             st.rerun()
-        st.download_button(
-            "Export (JSON)",
-            data=json_payload,
-            file_name=f"chat-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.json",
-            mime="application/json",
-            use_container_width=True,
+        if st.button("🧹 Clear chat", use_container_width=True, key="clear-chat-btn"):
+            clear_messages()
+            st.rerun()
+
+        # Search bar for conversations
+        search_query = st.text_input(
+            "Search conversations...", 
+            placeholder="Search by message content or title",
+            key="chat-search",
+            label_visibility="collapsed"
         )
-        if st.button("Settings panel", use_container_width=True):
-            st.session_state.ui["show_quick_settings"] = not st.session_state.ui.get("show_quick_settings", False)
 
-        st.divider()
-        st.subheader("Message Manager")
-        st.caption("Create, edit, or delete manual entries.")
-
-        with st.form("add-message-form"):
-            role = st.radio(
-                "Message role",
-                ("user", "assistant"),
-                horizontal=True,
-                key="add-role",
-            )
-            add_content = st.text_area(
-                "Message content",
-                placeholder="Type the text you want to inject...",
-                height=120,
-                key="add-content",
-            )
-            if st.form_submit_button("Add message"):
-                if add_content.strip():
-                    st.session_state.messages.append(create_message(role, add_content))
-                    st.success("Message added to the chat feed.")
-                    st.rerun()
-                else:
-                    st.warning("Content cannot be empty.")
-
-        choices = [choice for choice in list_message_choices() if choice["id"]]
-        if not choices:
-            st.info("No messages are available to edit or delete yet.")
-            return
-
-        label_map = {choice["id"]: choice["label"] for choice in choices}
-
-        with st.form("edit-message-form"):
-            edit_id = st.selectbox(
-                "Select a message to edit",
-                options=[choice["id"] for choice in choices],
-                format_func=lambda option: label_map.get(option, option),
-                key="edit-select",
-            )
-            target = find_message(edit_id) if edit_id else None
-            target_content = target.get("content", "") if target else ""
-            new_content = st.text_area(
-                "Updated content",
-                value=target_content,
-                height=150,
-                key=f"edit-content-{edit_id or 'none'}",
-            )
-            if st.form_submit_button("Save changes"):
-                if edit_id and update_message_content(edit_id, new_content):
-                    st.success("Message updated.")
-                    st.rerun()
-                else:
-                    st.warning("Select a message and provide new content before saving.")
-
-        with st.form("delete-message-form"):
-            delete_id = st.selectbox(
-                "Select a message to delete",
-                options=[choice["id"] for choice in choices],
-                format_func=lambda option: label_map.get(option, option),
-                key="delete-select",
-            )
-            confirm = st.checkbox("Yes, remove this message", key="delete-confirm")
-            if st.form_submit_button("Delete message"):
-                if confirm and delete_id and delete_message(delete_id):
-                    st.success("Message removed from the chat feed.")
-                    st.rerun()
-                elif not confirm:
-                    st.warning("Confirm the deletion before proceeding.")
-                else:
-                    st.warning("Unable to delete the selected message.")
+        thread_ids = [thread["id"] for thread in st.session_state.chat_threads]
+        current_id = st.session_state.get("active_thread_id", thread_ids[0] if thread_ids else None)
+        thread_labels = {thread["id"]: derive_thread_title(thread) for thread in st.session_state.chat_threads}
+        
+        # Filter threads based on search query
+        filtered_threads = st.session_state.chat_threads
+        if search_query.strip():
+            filtered_threads = []
+            query_lower = search_query.lower().strip()
+            for thread in st.session_state.chat_threads:
+                # Search in thread title
+                title_match = query_lower in thread.get("title", "").lower()
+                
+                # Search in message content
+                content_match = False
+                for message in thread.get("messages", []):
+                    if query_lower in message.get("content", "").lower():
+                        content_match = True
+                        break
+                
+                if title_match or content_match:
+                    filtered_threads.append(thread)
+        
+        st.markdown('<p class="history-label">👤 User</p>', unsafe_allow_html=True)
+        st.markdown('<div class="history-button-group">', unsafe_allow_html=True)
+        
+        if not filtered_threads and search_query.strip():
+            st.markdown('<p style="opacity: 0.6; font-size: 0.85rem; padding: 0.5rem;">No conversations found</p>', unsafe_allow_html=True)
+        
+        for thread in filtered_threads:
+            thread_id = thread["id"]
+            label = thread_labels.get(thread_id, "Chat")
+            button_text = f"👤 User · {label}"
+            disabled = thread_id == current_id
+            if st.button(
+                button_text,
+                use_container_width=True,
+                key=f"thread-btn-{thread_id}",
+                disabled=disabled,
+                help="Current conversation" if disabled else None,
+            ) and not disabled:
+                switch_thread(thread_id)
+                st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 def render_header() -> None:
     st.markdown(
         '<div class="welcome-wrap"><h1 class="welcome-heading">Welcome</h1></div>',
@@ -659,6 +775,7 @@ def main() -> None:
     if user_prompt:
         user_message = create_message("user", user_prompt)
         st.session_state.messages.append(user_message)
+        refresh_active_thread_title()
         placeholder = render_chat_feed(chat_feed, include_placeholder=True)
         with st.spinner("Thinking through the best reply..."):
             ai_text = generate_ai_reply(user_prompt)
@@ -677,8 +794,6 @@ def main() -> None:
     payloads = export_payloads()
     sidebar_actions(payloads["json"])
     quick_settings_panel()
-
-    st.caption("Need ideas? Try asking for UX critiques, summaries, or code reviews.")
 
 
 if __name__ == "__main__":
