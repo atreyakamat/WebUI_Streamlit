@@ -117,10 +117,32 @@ def switch_thread(thread_id: str) -> None:
     st.session_state.messages = target.get("messages", [])
 
 
+def delete_thread(thread_id: str) -> None:
+    threads = st.session_state.get("chat_threads", [])
+    if not threads:
+        return
+    remaining = [thread for thread in threads if thread.get("id") != thread_id]
+    if len(remaining) == len(threads):
+        return
+    if not remaining:
+        fresh = create_thread()
+        st.session_state.chat_threads = [fresh]
+        st.session_state.active_thread_id = fresh["id"]
+        st.session_state.messages = fresh["messages"]
+        return
+    st.session_state.chat_threads = remaining
+    active_id = st.session_state.get("active_thread_id")
+    if active_id == thread_id or active_id not in {thread.get("id") for thread in remaining}:
+        st.session_state.active_thread_id = remaining[0]["id"]
+        st.session_state.messages = remaining[0].get("messages", [])
+    else:
+        sync_active_messages()
+
+
 def derive_thread_title(thread: Dict[str, Any]) -> str:
     existing = thread.get("title") or "New chat"
     messages: List[Dict[str, str]] = thread.get("messages", [])
-    for message in messages:
+    for message in reversed(messages):
         if message.get("role") == "user" and message.get("content"):
             snippet = message["content"].splitlines()[0]
             if len(snippet) > 36:
@@ -223,6 +245,44 @@ def inject_global_styles(theme: Dict[str, str]) -> None:
         display: flex;
         flex-direction: column;
         gap: 0.3rem;
+    }}
+    .history-entry {{
+        position: relative;
+        display: flex;
+        width: 100%;
+        gap: 0.4rem;
+        align-items: stretch;
+    }}
+    .history-entry [data-testid="column"] {{
+        padding: 0 !important;
+        display: flex;
+        align-items: stretch;
+    }}
+    .history-entry [data-testid="column"]:first-child {{
+        flex: 1 1 auto;
+    }}
+    .history-entry [data-testid="column"]:first-child button {{
+        width: 100%;
+    }}
+    .history-entry [data-testid="column"]:last-child {{
+        flex: 0 0 auto;
+    }}
+    .history-entry .delete-button {{
+        display: flex;
+        justify-content: flex-end;
+    }}
+    .history-entry .delete-button button {{
+        width: 40px;
+        height: 40px;
+        border-radius: 0.8rem;
+        border: 1px solid var(--border-color);
+        background: rgba(255, 255, 255, 0.04);
+        color: inherit;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    }}
+    .history-entry:hover .delete-button button {{
+        opacity: 1;
     }}
     .history-button-group button {{
         justify-content: flex-start;
@@ -712,7 +772,7 @@ def sidebar_actions(json_payload: str) -> None:
 
         thread_ids = [thread["id"] for thread in st.session_state.chat_threads]
         current_id = st.session_state.get("active_thread_id", thread_ids[0] if thread_ids else None)
-        thread_labels = {thread["id"]: derive_thread_title(thread) for thread in st.session_state.chat_threads}
+        thread_labels = {thread["id"]: derive_thread_title(thread) or "New chat" for thread in st.session_state.chat_threads}
         
         # Filter threads based on search query
         filtered_threads = st.session_state.chat_threads
@@ -733,26 +793,40 @@ def sidebar_actions(json_payload: str) -> None:
                 if title_match or content_match:
                     filtered_threads.append(thread)
         
-        st.markdown('<p class="history-label">👤 User</p>', unsafe_allow_html=True)
+        st.markdown('<p class="history-label">Chats</p>', unsafe_allow_html=True)
         st.markdown('<div class="history-button-group">', unsafe_allow_html=True)
-        
+
         if not filtered_threads and search_query.strip():
             st.markdown('<p style="opacity: 0.6; font-size: 0.85rem; padding: 0.5rem;">No conversations found</p>', unsafe_allow_html=True)
-        
+
         for thread in filtered_threads:
             thread_id = thread["id"]
-            label = thread_labels.get(thread_id, "Chat")
-            button_text = f"👤 User · {label}"
+            label = thread_labels.get(thread_id, "New chat")
             disabled = thread_id == current_id
-            if st.button(
-                button_text,
-                use_container_width=True,
-                key=f"thread-btn-{thread_id}",
-                disabled=disabled,
-                help="Current conversation" if disabled else None,
-            ) and not disabled:
-                switch_thread(thread_id)
-                st.rerun()
+            entry = st.container()
+            entry.markdown('<div class="history-entry">', unsafe_allow_html=True)
+            select_col, delete_col = entry.columns([1, 0.12], gap="small")
+            with select_col:
+                if st.button(
+                    label,
+                    use_container_width=True,
+                    key=f"thread-btn-{thread_id}",
+                    disabled=disabled,
+                    help="Current conversation" if disabled else None,
+                ) and not disabled:
+                    switch_thread(thread_id)
+                    st.rerun()
+            with delete_col:
+                st.markdown('<div class="delete-button">', unsafe_allow_html=True)
+                if st.button(
+                    "🗑",
+                    key=f"delete-thread-{thread_id}",
+                    help="Delete chat",
+                ):
+                    delete_thread(thread_id)
+                    st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
+            entry.markdown('</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 def render_header() -> None:
     st.markdown(
