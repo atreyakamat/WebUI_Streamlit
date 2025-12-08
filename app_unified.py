@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import uuid
 from datetime import datetime
 import time
@@ -35,40 +36,73 @@ st.markdown("""
     
     /* SIDEBAR STYLING */
     section[data-testid="stSidebar"] {
-        background-color: #000000;
-        border-right: 1px solid #222;
-        transition: all 0.3s ease;
+        background-color: #000000 !important;
+        border-right: 1px solid #222 !important;
+        transition: all 0.3s ease !important;
+        position: fixed !important;
+        left: 0 !important;
+        top: 0 !important;
+        height: 100vh !important;
+        z-index: 999 !important;
     }
     
-    /* HAMBURGER MENU TOGGLE BUTTON */
-    .hamburger-btn {
-        position: fixed;
-        top: 1rem;
-        left: 1rem;
-        z-index: 9999;
+    /* Sidebar content */
+    section[data-testid="stSidebar"] > div {
+        background-color: #000000 !important;
+    }
+    
+    /* Make main content adjust when sidebar is visible */
+    section[data-testid="stSidebar"][style*="margin-left: 0px"] ~ div[data-testid="stAppViewContainer"] {
+        margin-left: 336px;
+        transition: margin-left 0.3s ease;
+    }
+    
+    /* SIDEBAR SEARCH BAR */
+    .sidebar-search {
         background-color: #1a1a1a;
         border: 1px solid #333;
         border-radius: 8px;
-        padding: 10px 12px;
-        cursor: pointer;
+        padding: 8px 12px;
+        margin-bottom: 10px;
         color: #fff;
-        font-size: 1.2rem;
-        transition: all 0.3s ease;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        width: 100%;
+    }
+    
+    /* SIDEBAR SECTION HEADERS */
+    .sidebar-section {
+        color: #999;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin: 20px 0 10px 0;
+        font-weight: 600;
+    }
+    
+    /* CHAT ITEM STYLING */
+    .chat-item {
+        background-color: transparent;
+        padding: 10px 12px;
+        border-radius: 8px;
+        margin-bottom: 4px;
+        cursor: pointer;
+        transition: all 0.2s ease;
         display: flex;
+        justify-content: space-between;
         align-items: center;
-        justify-content: center;
-        width: 44px;
-        height: 44px;
     }
-    .hamburger-btn:hover {
+    .chat-item:hover {
+        background-color: #1a1a1a;
+    }
+    .chat-item.active {
         background-color: #2a2a2a;
-        border-color: #555;
-        transform: scale(1.1);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        border-left: 3px solid #3b82f6;
     }
-    .hamburger-btn:active {
-        transform: scale(0.95);
+    .chat-item-actions {
+        display: none;
+        gap: 8px;
+    }
+    .chat-item:hover .chat-item-actions {
+        display: flex;
     }
     
     /* NEW CHAT BUTTON */
@@ -235,7 +269,13 @@ def rename_thread(thread_id, new_name):
             break
 
 def generate_title(text):
-    return text[:25] + "..." if len(text) > 25 else text
+    """Auto-generate chat title from the first query"""
+    # Remove extra whitespace and limit length
+    title = " ".join(text.split())
+    # Capitalize first letter
+    title = title[0].upper() + title[1:] if title else "New Chat"
+    # Limit to 40 characters
+    return title[:40] + "..." if len(title) > 40 else title
 
 def call_ollama_backend(prompt: str, conversation_id: str, model: str = "llama3.2") -> str:
     """Call FastAPI backend with Ollama integration."""
@@ -272,117 +312,226 @@ def call_ollama_backend(prompt: str, conversation_id: str, model: str = "llama3.
         st.warning(f"Backend connection failed: {e}")
         return None
 
-# --- 4. SIDEBAR UI ---
+# --- 4. SIDEBAR UI WITH HAMBURGER TOGGLE ---
 
-# Hamburger Menu Toggle (Fixed position, always visible)
-import streamlit.components.v1 as components
-
-components.html(
-    """
-    <style>
-    .hamburger-toggle {
-        position: fixed;
-        top: 1rem;
-        left: 1rem;
-        z-index: 9999;
+# Hamburger Toggle Button (Always Visible) - Using components for better control
+components.html("""
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+    body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+    }
+    .hamburger-btn {
+        position: absolute;
+        top: 0;
+        left: 0;
         background-color: #1a1a1a;
         border: 1px solid #333;
         border-radius: 8px;
         padding: 10px 12px;
         cursor: pointer;
         color: #fff;
-        font-size: 1.2rem;
-        transition: all 0.3s ease;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        font-size: 1.5rem;
         width: 44px;
         height: 44px;
         display: flex;
         align-items: center;
         justify-content: center;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     }
-    .hamburger-toggle:hover {
+    .hamburger-btn:hover {
         background-color: #2a2a2a;
         border-color: #555;
         transform: scale(1.1);
         box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     }
-    </style>
-    <div class="hamburger-toggle" id="hamburger-btn">☰</div>
-    <script>
-    (function() {
-        const btn = document.getElementById('hamburger-btn');
-        btn.addEventListener('click', function() {
-            // Access parent document (Streamlit iframe)
-            const parentDoc = window.parent.document;
+</style>
+</head>
+<body>
+<button class="hamburger-btn" onclick="toggleSidebar()">☰</button>
+<script>
+    // Position the iframe container in parent
+    const iframe = window.frameElement;
+    if (iframe) {
+        iframe.style.position = 'fixed';
+        iframe.style.top = '1rem';
+        iframe.style.left = '1rem';
+        iframe.style.zIndex = '999999';
+        iframe.style.width = '60px';
+        iframe.style.height = '60px';
+        iframe.style.border = 'none';
+        iframe.style.pointerEvents = 'auto';
+    }
+    
+    let sidebarCollapsed = false;
+    let forcedState = null;
+    
+    function toggleSidebar() {
+        const parent = window.parent.document;
+        const sidebar = parent.querySelector('[data-testid="stSidebar"]');
+        const mainContent = parent.querySelector('[data-testid="stAppViewContainer"]');
+        
+        if (!sidebar) {
+            console.log('Sidebar not found');
+            return;
+        }
+        
+        sidebarCollapsed = !sidebarCollapsed;
+        forcedState = sidebarCollapsed;
+        
+        // Force sidebar to left side and make it visible
+        sidebar.style.setProperty('position', 'fixed', 'important');
+        sidebar.style.setProperty('left', '0', 'important');
+        sidebar.style.setProperty('top', '0', 'important');
+        sidebar.style.setProperty('height', '100vh', 'important');
+        sidebar.style.setProperty('width', '336px', 'important');
+        sidebar.style.setProperty('z-index', '999', 'important');
+        sidebar.style.setProperty('background-color', '#000000', 'important');
+        sidebar.style.setProperty('border-right', '1px solid #222', 'important');
+        sidebar.style.setProperty('overflow-y', 'auto', 'important');
+        
+        if (sidebarCollapsed) {
+            // Collapse sidebar - move it off screen to the left
+            sidebar.style.setProperty('transform', 'translateX(-100%)', 'important');
+            sidebar.style.setProperty('margin-left', '0px', 'important');
+            if (mainContent) {
+                mainContent.style.setProperty('margin-left', '0', 'important');
+            }
+            console.log('Collapsing sidebar');
+        } else {
+            // Expand sidebar - bring it back
+            sidebar.style.setProperty('transform', 'translateX(0)', 'important');
+            sidebar.style.setProperty('margin-left', '0px', 'important');
+            if (mainContent) {
+                mainContent.style.setProperty('margin-left', '336px', 'important');
+            }
+            console.log('Expanding sidebar');
+        }
+    }
+    
+    // Keep the sidebar in the forced state and ensure left positioning
+    setInterval(() => {
+        const parent = window.parent.document;
+        const sidebar = parent.querySelector('[data-testid="stSidebar"]');
+        const mainContent = parent.querySelector('[data-testid="stAppViewContainer"]');
+        
+        if (sidebar) {
+            // Always ensure sidebar is on the left
+            sidebar.style.setProperty('position', 'fixed', 'important');
+            sidebar.style.setProperty('left', '0', 'important');
+            sidebar.style.setProperty('right', 'auto', 'important');
+            sidebar.style.setProperty('top', '0', 'important');
+            sidebar.style.setProperty('height', '100vh', 'important');
+            sidebar.style.setProperty('width', '336px', 'important');
+            sidebar.style.setProperty('background-color', '#000000', 'important');
             
-            // Find the collapse button
-            const collapseBtn = parentDoc.querySelector('[data-testid="collapsedControl"]');
-            
-            if (collapseBtn) {
-                collapseBtn.click();
-            } else {
-                // Alternative: try to find sidebar and toggle directly
-                const sidebar = parentDoc.querySelector('[data-testid="stSidebar"]');
-                if (sidebar) {
-                    // Simulate keyboard shortcut for sidebar toggle
-                    const event = new KeyboardEvent('keydown', {
-                        key: '[',
-                        ctrlKey: true,
-                        bubbles: true
-                    });
-                    parentDoc.dispatchEvent(event);
+            if (forcedState !== null) {
+                const currentTransform = window.getComputedStyle(sidebar).transform;
+                
+                if (forcedState) {
+                    // Keep collapsed
+                    if (!currentTransform.includes('matrix') || !currentTransform.includes('-336')) {
+                        sidebar.style.setProperty('transform', 'translateX(-100%)', 'important');
+                        if (mainContent) {
+                            mainContent.style.setProperty('margin-left', '0', 'important');
+                        }
+                    }
+                } else {
+                    // Keep expanded
+                    if (currentTransform.includes('-336') || currentTransform.includes('-100')) {
+                        sidebar.style.setProperty('transform', 'translateX(0)', 'important');
+                        if (mainContent) {
+                            mainContent.style.setProperty('margin-left', '336px', 'important');
+                        }
+                    }
                 }
             }
-        });
-    })();
-    </script>
-    """,
-    height=0,
-    width=0,
-)
+        }
+    }, 50);
+</script>
+</body>
+</html>
+""", height=60)
 
 with st.sidebar:
-    # 1. New Chat Button
+    # Header with New Chat and Settings
     col_new, col_set = st.columns([0.85, 0.15])
     with col_new:
-        if st.button("📝 New Chat", use_container_width=True):
+        if st.button("✨ New Chat", use_container_width=True, key="new_chat_btn"):
             create_new_chat()
             st.rerun()
     with col_set:
-        st.button("⚙️", help="Settings")
+        with st.popover("⚙️", use_container_width=True):
+            st.markdown("### ⚙️ Settings")
+            model_choice = st.selectbox("Model", ["llama3.2", "mistral", "codellama"], key="model_select")
+            temperature = st.slider("Temperature", 0.0, 2.0, 0.7, key="temp_slider")
+            st.markdown("---")
+            st.caption("Theme: Dark Mode")
+            if st.button("Clear All Chats", type="primary", key="clear_all_btn"):
+                st.session_state.chat_threads = []
+                create_new_chat()
+                st.rerun()
 
-    st.markdown("### Today")
+    st.markdown("---")
     
-    # 2. History List
-    for thread in st.session_state.chat_threads:
+    # Search Bar
+    search_query = st.text_input("🔍 Search chats...", key="search_input", label_visibility="collapsed", placeholder="Search chats...")
+    
+    st.markdown('<div class="sidebar-section">Conversations</div>', unsafe_allow_html=True)
+    
+    # 2. Chat History List with Search Filter
+    filtered_threads = [
+        t for t in st.session_state.chat_threads 
+        if search_query.lower() in t["title"].lower()
+    ] if search_query else st.session_state.chat_threads
+    
+    if not filtered_threads:
+        st.caption("No chats found")
+    
+    for thread in filtered_threads:
         t_id = thread["id"]
         t_title = thread["title"]
         is_active = (t_id == st.session_state.active_thread_id)
         
-        # Visual Styling for Active/Inactive
-        label_prefix = "🔹 " if is_active else ""
-        label = f"{label_prefix}{t_title}"
+        # Create a container for each chat item
+        col_chat, col_menu = st.columns([0.85, 0.15])
         
-        # We use a Popover to handle interaction (Click to open, or Rename/Delete)
-        # This acts as the "Chat Item"
-        with st.popover(label, use_container_width=True):
-            st.caption(f"Manage: {t_title}")
-            
-            # Switch to this chat
-            if st.button("📂 Open Chat", key=f"open_{t_id}"):
+        with col_chat:
+            if st.button(
+                f"{'💬' if is_active else '  '} {t_title[:30]}...",
+                key=f"chat_{t_id}",
+                use_container_width=True,
+                type="primary" if is_active else "secondary"
+            ):
                 st.session_state.active_thread_id = t_id
                 st.rerun()
-            
-            # Rename
-            new_name = st.text_input("Rename", value=t_title, key=f"ren_{t_id}")
-            if st.button("Save Name", key=f"save_{t_id}"):
-                rename_thread(t_id, new_name)
-                st.rerun()
+        
+        with col_menu:
+            with st.popover("⋮", use_container_width=True):
+                st.caption(f"**{t_title}**")
+                st.markdown("---")
                 
-            # Delete
-            if st.button("🗑️ Delete Chat", key=f"del_{t_id}", type="primary"):
-                delete_thread(t_id)
-                st.rerun()
+                # Rename option
+                with st.expander("✏️ Rename"):
+                    new_name = st.text_input("New name", value=t_title, key=f"ren_{t_id}", label_visibility="collapsed")
+                    if st.button("Save", key=f"save_{t_id}", use_container_width=True):
+                        rename_thread(t_id, new_name)
+                        st.rerun()
+                
+                # Delete option
+                st.markdown("")
+                if st.button("🗑️ Delete", key=f"del_{t_id}", use_container_width=True, type="primary"):
+                    delete_thread(t_id)
+                    st.rerun()
+    
+    # Footer info
+    st.markdown("---")
+    st.caption(f"💬 {len(st.session_state.chat_threads)} conversations")
 
 # --- 5. MAIN CHAT AREA ---
 
@@ -440,12 +589,15 @@ if user_input:
     if len(active_thread["messages"]) == 1:
         rename_thread(active_thread["id"], generate_title(user_input))
 
-    # 3. Call Ollama Backend
+    # 3. Get selected model from session state (default to llama3.2)
+    selected_model = st.session_state.get("model_select", "llama3.2")
+    
+    # 4. Call Ollama Backend
     with st.spinner("Thinking..."):
         ai_response = call_ollama_backend(
             prompt=user_input,
             conversation_id=active_thread["id"],
-            model="llama3.2"
+            model=selected_model
         )
     
     # Fallback to mock if backend fails
