@@ -34,27 +34,171 @@ st.markdown("""
     footer {display: none;}
     #MainMenu {visibility: hidden;}
     
-    /* SIDEBAR STYLING */
+    /* SIDEBAR STYLING - Enhanced Modern Design */
     section[data-testid="stSidebar"] {
-        background-color: #000000 !important;
-        border-right: 1px solid #222 !important;
-        transition: all 0.3s ease !important;
-        position: fixed !important;
-        left: 0 !important;
-        top: 0 !important;
-        height: 100vh !important;
+        background: linear-gradient(180deg, #000000 0%, #0a0a0a 100%) !important;
+        border-right: 1px solid #2a2a2a !important;
+        box-shadow: 4px 0 20px rgba(0,0,0,0.5) !important;
+        position: relative !important;
         z-index: 999 !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        transform: translateX(0) !important;
+        min-width: 280px !important;
+        width: 300px !important;
     }
     
-    /* Sidebar content */
+    /* Sidebar content wrapper */
     section[data-testid="stSidebar"] > div {
-        background-color: #000000 !important;
+        background: transparent !important;
+        padding-top: 2rem !important;
     }
     
-    /* Make main content adjust when sidebar is visible */
-    section[data-testid="stSidebar"][style*="margin-left: 0px"] ~ div[data-testid="stAppViewContainer"] {
-        margin-left: 336px;
-        transition: margin-left 0.3s ease;
+    /* Sidebar scrollbar styling */
+    section[data-testid="stSidebar"] ::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    section[data-testid="stSidebar"] ::-webkit-scrollbar-track {
+        background: #0a0a0a;
+    }
+    
+    section[data-testid="stSidebar"] ::-webkit-scrollbar-thumb {
+        background: #333;
+        border-radius: 4px;
+    }
+    
+    section[data-testid="stSidebar"] ::-webkit-scrollbar-thumb:hover {
+        background: #444;
+    }
+    
+    /* Sidebar buttons styling */
+    section[data-testid="stSidebar"] .stButton > button {
+        background: linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%) !important;
+        color: #fff !important;
+        border: 1px solid #333 !important;
+        border-radius: 8px !important;
+        padding: 0.6rem 1rem !important;
+        font-weight: 500 !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+    }
+    
+    section[data-testid="stSidebar"] .stButton > button:hover {
+        background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%) !important;
+        border-color: #444 !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.4) !important;
+    }
+    
+    /* Primary button (active/new chat) */
+    section[data-testid="stSidebar"] .stButton > button[kind="primary"] {
+        background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%) !important;
+        border-color: #1e40af !important;
+        box-shadow: 0 2px 12px rgba(37, 99, 235, 0.3) !important;
+    }
+    
+    section[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {
+        background: linear-gradient(135deg, #1d4ed8 0%, #1e3a8a 100%) !important;
+        box-shadow: 0 4px 16px rgba(37, 99, 235, 0.5) !important;
+    }
+    
+    /* Sidebar text input */
+    section[data-testid="stSidebar"] .stTextInput > div > div > input {
+        background-color: #1a1a1a !important;
+        border: 1px solid #333 !important;
+        border-radius: 8px !important;
+        color: #fff !important;
+        padding: 0.6rem 1rem !important;
+    }
+    
+    section[data-testid="stSidebar"] .stTextInput > div > div > input:focus {
+        border-color: #2563eb !important;
+        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2) !important;
+    }
+    
+    /* Sidebar popover */
+    section[data-testid="stSidebar"] [data-testid="stPopover"] {
+        background: transparent !important;
+    }
+    
+    section[data-testid="stSidebar"] [data-testid="stPopover"] > button {
+        background: #1a1a1a !important;
+        border: 1px solid #333 !important;
+        color: #999 !important;
+        padding: 0.4rem 0.6rem !important;
+        border-radius: 6px !important;
+    }
+    
+    section[data-testid="stSidebar"] [data-testid="stPopover"] > button:hover {
+        background: #2a2a2a !important;
+        color: #fff !important;
+        border-color: #444 !important;
+    }
+    
+    /* History button group styling */
+    .history-button-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+        margin-top: 0.5rem;
+    }
+    
+    .history-entry {
+        position: relative;
+        display: flex;
+        width: 100%;
+        gap: 0.4rem;
+        align-items: stretch;
+    }
+    
+    .history-entry [data-testid="column"] {
+        padding: 0 !important;
+        display: flex;
+        align-items: stretch;
+    }
+    
+    .history-entry [data-testid="column"]:first-child {
+        flex: 1 1 auto;
+    }
+    
+    .history-entry [data-testid="column"]:first-child button {
+        width: 100% !important;
+    }
+    
+    .history-entry [data-testid="column"]:last-child {
+        flex: 0 0 auto;
+    }
+    
+    .history-entry .delete-button {
+        display: flex;
+        justify-content: flex-end;
+    }
+    
+    .history-entry .delete-button button {
+        width: 40px !important;
+        height: 40px !important;
+        min-width: 40px !important;
+        border-radius: 0.8rem !important;
+        border: 1px solid var(--border-color, #333) !important;
+        background: rgba(255, 50, 50, 0.1) !important;
+        color: #ff6b6b !important;
+        padding: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        transition: all 0.2s ease !important;
+    }
+    
+    .history-entry:hover .delete-button button {
+        background: rgba(255, 50, 50, 0.2) !important;
+        border-color: #ff6b6b !important;
+    }
+    
+    .history-entry .delete-button button:hover {
+        background: rgba(255, 50, 50, 0.3) !important;
+        transform: scale(1.05) !important;
     }
     
     /* SIDEBAR SEARCH BAR */
@@ -268,6 +412,19 @@ def rename_thread(thread_id, new_name):
             thread["title"] = new_name
             break
 
+def derive_thread_title(thread):
+    """Derive a title from the thread's first user message."""
+    existing = thread.get("title") or "New Chat"
+    messages = thread.get("messages", [])
+    for message in reversed(messages):
+        if message.get("role") == "user" and message.get("content"):
+            snippet = message["content"].splitlines()[0]
+            if len(snippet) > 36:
+                snippet = snippet[:33] + "..."
+            thread["title"] = snippet or existing
+            return thread["title"]
+    return existing
+
 def generate_title(text):
     """Auto-generate chat title from the first query"""
     # Remove extra whitespace and limit length
@@ -312,157 +469,135 @@ def call_ollama_backend(prompt: str, conversation_id: str, model: str = "llama3.
         st.warning(f"Backend connection failed: {e}")
         return None
 
-# --- 4. SIDEBAR UI WITH HAMBURGER TOGGLE ---
+# --- 4. SIDEBAR WITH CHATGPT-STYLE UI ---
 
-# Hamburger Toggle Button (Always Visible) - Using components for better control
-components.html("""
-<!DOCTYPE html>
-<html>
-<head>
+# Add working sidebar toggle with smooth animation
+st.markdown("""
 <style>
-    body {
-        margin: 0;
-        padding: 0;
-        overflow: hidden;
+    /* Force sidebar to be visible and properly styled */
+    section[data-testid="stSidebar"] {
+        min-width: 280px !important;
+        max-width: 320px !important;
+        visibility: visible !important;
+        display: block !important;
+        opacity: 1 !important;
+        transition: transform 0.3s ease-in-out !important;
     }
-    .hamburger-btn {
-        position: absolute;
-        top: 0;
-        left: 0;
-        background-color: #1a1a1a;
-        border: 1px solid #333;
-        border-radius: 8px;
-        padding: 10px 12px;
-        cursor: pointer;
-        color: #fff;
-        font-size: 1.5rem;
+    
+    /* Collapsed state */
+    section[data-testid="stSidebar"][data-collapsed="true"] {
+        transform: translateX(-100%) !important;
+    }
+    
+    /* Toggle button styling */
+    .sidebar-toggle-btn {
+        position: fixed;
+        top: 1rem;
+        left: 1rem;
         width: 44px;
         height: 44px;
+        background: linear-gradient(135deg, #1a1a1a, #0f0f0f);
+        border: 2px solid #333;
+        border-radius: 10px;
+        color: #fff;
+        font-size: 1.3rem;
+        cursor: pointer;
+        z-index: 999999;
         display: flex;
         align-items: center;
         justify-content: center;
         transition: all 0.3s ease;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    }
-    .hamburger-btn:hover {
-        background-color: #2a2a2a;
-        border-color: #555;
-        transform: scale(1.1);
         box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     }
+    .sidebar-toggle-btn:hover {
+        background: linear-gradient(135deg, #2563eb, #1e40af);
+        transform: scale(1.08);
+        box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+    }
+    
+    /* When sidebar is collapsed, move button */
+    .sidebar-collapsed .sidebar-toggle-btn {
+        left: 1rem;
+    }
+    
+    /* When sidebar is open, move button to right of sidebar */
+    .sidebar-open .sidebar-toggle-btn {
+        left: 320px;
+    }
 </style>
-</head>
-<body>
-<button class="hamburger-btn" onclick="toggleSidebar()">☰</button>
+
+<div id="sidebar-toggle-container"></div>
+
 <script>
-    // Position the iframe container in parent
-    const iframe = window.frameElement;
-    if (iframe) {
-        iframe.style.position = 'fixed';
-        iframe.style.top = '1rem';
-        iframe.style.left = '1rem';
-        iframe.style.zIndex = '999999';
-        iframe.style.width = '60px';
-        iframe.style.height = '60px';
-        iframe.style.border = 'none';
-        iframe.style.pointerEvents = 'auto';
-    }
-    
-    let sidebarCollapsed = false;
-    let forcedState = null;
-    
-    function toggleSidebar() {
-        const parent = window.parent.document;
-        const sidebar = parent.querySelector('[data-testid="stSidebar"]');
-        const mainContent = parent.querySelector('[data-testid="stAppViewContainer"]');
-        
-        if (!sidebar) {
-            console.log('Sidebar not found');
-            return;
+(function() {
+    // Create toggle button
+    const createToggleButton = () => {
+        let toggleBtn = document.getElementById('sidebar-toggle-button');
+        if (!toggleBtn) {
+            toggleBtn = document.createElement('button');
+            toggleBtn.id = 'sidebar-toggle-button';
+            toggleBtn.className = 'sidebar-toggle-btn';
+            toggleBtn.innerHTML = '☰';
+            toggleBtn.onclick = toggleSidebar;
+            document.body.appendChild(toggleBtn);
         }
+        return toggleBtn;
+    };
+    
+    // Toggle sidebar function
+    const toggleSidebar = () => {
+        const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
+        if (!sidebar) return;
         
-        sidebarCollapsed = !sidebarCollapsed;
-        forcedState = sidebarCollapsed;
+        const isCollapsed = sidebar.getAttribute('data-collapsed') === 'true';
         
-        // Force sidebar to left side and make it visible
-        sidebar.style.setProperty('position', 'fixed', 'important');
-        sidebar.style.setProperty('left', '0', 'important');
-        sidebar.style.setProperty('top', '0', 'important');
-        sidebar.style.setProperty('height', '100vh', 'important');
-        sidebar.style.setProperty('width', '336px', 'important');
-        sidebar.style.setProperty('z-index', '999', 'important');
-        sidebar.style.setProperty('background-color', '#000000', 'important');
-        sidebar.style.setProperty('border-right', '1px solid #222', 'important');
-        sidebar.style.setProperty('overflow-y', 'auto', 'important');
-        
-        if (sidebarCollapsed) {
-            // Collapse sidebar - move it off screen to the left
-            sidebar.style.setProperty('transform', 'translateX(-100%)', 'important');
-            sidebar.style.setProperty('margin-left', '0px', 'important');
-            if (mainContent) {
-                mainContent.style.setProperty('margin-left', '0', 'important');
-            }
-            console.log('Collapsing sidebar');
+        if (isCollapsed) {
+            // Show sidebar
+            sidebar.setAttribute('data-collapsed', 'false');
+            sidebar.style.transform = 'translateX(0)';
+            document.body.classList.remove('sidebar-collapsed');
+            document.body.classList.add('sidebar-open');
         } else {
-            // Expand sidebar - bring it back
-            sidebar.style.setProperty('transform', 'translateX(0)', 'important');
-            sidebar.style.setProperty('margin-left', '0px', 'important');
-            if (mainContent) {
-                mainContent.style.setProperty('margin-left', '336px', 'important');
-            }
-            console.log('Expanding sidebar');
+            // Hide sidebar
+            sidebar.setAttribute('data-collapsed', 'true');
+            sidebar.style.transform = 'translateX(-100%)';
+            document.body.classList.remove('sidebar-open');
+            document.body.classList.add('sidebar-collapsed');
         }
-    }
+    };
     
-    // Keep the sidebar in the forced state and ensure left positioning
-    setInterval(() => {
-        const parent = window.parent.document;
-        const sidebar = parent.querySelector('[data-testid="stSidebar"]');
-        const mainContent = parent.querySelector('[data-testid="stAppViewContainer"]');
-        
+    // Initialize
+    setTimeout(() => {
+        createToggleButton();
+        const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
         if (sidebar) {
-            // Always ensure sidebar is on the left
-            sidebar.style.setProperty('position', 'fixed', 'important');
-            sidebar.style.setProperty('left', '0', 'important');
-            sidebar.style.setProperty('right', 'auto', 'important');
-            sidebar.style.setProperty('top', '0', 'important');
-            sidebar.style.setProperty('height', '100vh', 'important');
-            sidebar.style.setProperty('width', '336px', 'important');
-            sidebar.style.setProperty('background-color', '#000000', 'important');
-            
-            if (forcedState !== null) {
-                const currentTransform = window.getComputedStyle(sidebar).transform;
-                
-                if (forcedState) {
-                    // Keep collapsed
-                    if (!currentTransform.includes('matrix') || !currentTransform.includes('-336')) {
-                        sidebar.style.setProperty('transform', 'translateX(-100%)', 'important');
-                        if (mainContent) {
-                            mainContent.style.setProperty('margin-left', '0', 'important');
-                        }
-                    }
-                } else {
-                    // Keep expanded
-                    if (currentTransform.includes('-336') || currentTransform.includes('-100')) {
-                        sidebar.style.setProperty('transform', 'translateX(0)', 'important');
-                        if (mainContent) {
-                            mainContent.style.setProperty('margin-left', '336px', 'important');
-                        }
-                    }
-                }
-            }
+            sidebar.setAttribute('data-collapsed', 'false');
+            document.body.classList.add('sidebar-open');
         }
-    }, 50);
+    }, 100);
+    
+    // Re-create button on page updates
+    const observer = new MutationObserver(createToggleButton);
+    observer.observe(document.body, { childList: true, subtree: true });
+})();
 </script>
-</body>
-</html>
-""", height=60)
+""", unsafe_allow_html=True)
 
 with st.sidebar:
-    # Header with New Chat and Settings
-    col_new, col_set = st.columns([0.85, 0.15])
+    # Sidebar Title with Logo
+    st.markdown("""
+        <div style='text-align: center; padding: 1rem 0; margin-bottom: 1rem; border-bottom: 1px solid #222;'>
+            <h2 style='color: #fff; font-size: 1.5rem; margin: 0; display: flex; align-items: center; justify-content: center; gap: 10px;'>
+                <span style='font-size: 2rem;'>🦙</span>
+                <span>Ollama Chat</span>
+            </h2>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # New Chat and Settings buttons
+    col_new, col_set = st.columns([0.82, 0.18])
     with col_new:
-        if st.button("✨ New Chat", use_container_width=True, key="new_chat_btn"):
+        if st.button("✨ New Chat", use_container_width=True, key="new_chat_btn", type="primary"):
             create_new_chat()
             st.rerun()
     with col_set:
@@ -480,54 +615,82 @@ with st.sidebar:
     st.markdown("---")
     
     # Search Bar
-    search_query = st.text_input("🔍 Search chats...", key="search_input", label_visibility="collapsed", placeholder="Search chats...")
+    st.markdown('<div style="padding: 0 0.5rem; margin-bottom: 0.5rem;"><small style="color: #666; font-weight: 600;">🔍 SEARCH</small></div>', unsafe_allow_html=True)
+    search_query = st.text_input(
+        "Search conversations...", 
+        placeholder="Search by message content or title",
+        key="search_input",
+        label_visibility="collapsed"
+    )
     
-    st.markdown('<div class="sidebar-section">Conversations</div>', unsafe_allow_html=True)
+    st.markdown('<div style="padding: 0.5rem; color: #666; font-size: 0.7rem; font-weight: 600; letter-spacing: 1px; margin-top: 1rem;">CONVERSATIONS</div>', unsafe_allow_html=True)
     
-    # 2. Chat History List with Search Filter
-    filtered_threads = [
-        t for t in st.session_state.chat_threads 
-        if search_query.lower() in t["title"].lower()
-    ] if search_query else st.session_state.chat_threads
+    # Filter threads based on search query
+    filtered_threads = st.session_state.chat_threads
+    if search_query.strip():
+        filtered_threads = []
+        query_lower = search_query.lower().strip()
+        for thread in st.session_state.chat_threads:
+            # Search in thread title
+            title_match = query_lower in thread.get("title", "").lower()
+            
+            # Search in message content
+            content_match = False
+            for message in thread.get("messages", []):
+                if query_lower in message.get("content", "").lower():
+                    content_match = True
+                    break
+            
+            if title_match or content_match:
+                filtered_threads.append(thread)
     
-    if not filtered_threads:
-        st.caption("No chats found")
+    if not filtered_threads and search_query.strip():
+        st.caption("❌ No conversations found")
+    
+    # Render conversation list with delete buttons
+    st.markdown('<div class="history-button-group">', unsafe_allow_html=True)
     
     for thread in filtered_threads:
         t_id = thread["id"]
-        t_title = thread["title"]
+        t_title = derive_thread_title(thread)
         is_active = (t_id == st.session_state.active_thread_id)
         
-        # Create a container for each chat item
-        col_chat, col_menu = st.columns([0.85, 0.15])
+        # Create entry with select and delete columns
+        entry = st.container()
+        entry.markdown('<div class="history-entry">', unsafe_allow_html=True)
+        
+        col_chat, col_delete = entry.columns([0.85, 0.15])
         
         with col_chat:
             if st.button(
                 f"{'💬' if is_active else '  '} {t_title[:30]}...",
                 key=f"chat_{t_id}",
                 use_container_width=True,
-                type="primary" if is_active else "secondary"
+                type="primary" if is_active else "secondary",
+                disabled=is_active,
             ):
                 st.session_state.active_thread_id = t_id
+                # Update messages for the selected thread
+                for thread in st.session_state.chat_threads:
+                    if thread["id"] == t_id:
+                        st.session_state.messages = thread["messages"]
+                        break
                 st.rerun()
         
-        with col_menu:
-            with st.popover("⋮", use_container_width=True):
-                st.caption(f"**{t_title}**")
-                st.markdown("---")
-                
-                # Rename option
-                with st.expander("✏️ Rename"):
-                    new_name = st.text_input("New name", value=t_title, key=f"ren_{t_id}", label_visibility="collapsed")
-                    if st.button("Save", key=f"save_{t_id}", use_container_width=True):
-                        rename_thread(t_id, new_name)
-                        st.rerun()
-                
-                # Delete option
-                st.markdown("")
-                if st.button("🗑️ Delete", key=f"del_{t_id}", use_container_width=True, type="primary"):
-                    delete_thread(t_id)
-                    st.rerun()
+        with col_delete:
+            st.markdown('<div class="delete-button">', unsafe_allow_html=True)
+            if st.button(
+                "🗑",
+                key=f"del_{t_id}",
+                help="Delete chat",
+            ):
+                delete_thread(t_id)
+                st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        entry.markdown('</div>', unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
     
     # Footer info
     st.markdown("---")

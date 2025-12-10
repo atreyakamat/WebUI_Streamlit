@@ -1,0 +1,261 @@
+================================================================================
+                    OLLAMA UI SETUP GUIDE
+================================================================================
+
+This guide will help you set up the Ollama UI with backend integration.
+
+================================================================================
+                    PREREQUISITES
+================================================================================
+
+1. Python 3.8 or higher
+2. Ollama installed on your system
+3. pip (Python package manager)
+
+================================================================================
+                    STEP 1: INSTALL OLLAMA
+================================================================================
+
+Windows:
+--------
+1. Download Ollama from: https://ollama.ai/download
+2. Run the installer (OllamaSetup.exe)
+3. Follow the installation wizard
+4. Ollama will automatically start as a service
+
+Verify Installation:
+--------------------
+Open PowerShell and run:
+    ollama --version
+
+You should see the version number displayed.
+
+================================================================================
+                    STEP 2: PULL OLLAMA MODELS
+================================================================================
+
+Open PowerShell and run the following commands to download AI models:
+
+    ollama pull llama3.2
+    ollama pull mistral
+    ollama pull codellama
+
+This will download the models (each is several GB, so it may take time).
+
+Verify Models:
+--------------
+    ollama list
+
+You should see the models you just downloaded.
+
+Test a Model:
+-------------
+    ollama run llama3.2
+
+Type a message to test. Press Ctrl+D or type "/bye" to exit.
+
+================================================================================
+                    STEP 3: INSTALL PYTHON DEPENDENCIES
+================================================================================
+
+Navigate to the project directory:
+    cd c:\Projects\WebUI_Streamlit
+
+Install required packages:
+    pip install streamlit
+    pip install fastapi
+    pip install uvicorn
+    pip install requests
+    pip install python-multipart
+
+Or install all at once:
+    pip install streamlit fastapi uvicorn requests python-multipart
+
+================================================================================
+                    STEP 4: START THE BACKEND SERVER
+================================================================================
+
+The backend server connects Streamlit to Ollama.
+
+In PowerShell (Terminal 1):
+    cd c:\Projects\WebUI_Streamlit
+    python backend.py
+
+You should see:
+    "Uvicorn running on http://127.0.0.1:8000"
+    "Ollama backend running at: http://localhost:11434"
+
+Keep this terminal running!
+
+================================================================================
+                    STEP 5: START THE STREAMLIT UI
+================================================================================
+
+Open a NEW PowerShell terminal (Terminal 2):
+    cd c:\Projects\WebUI_Streamlit
+    streamlit run app_unified.py
+
+Your browser should automatically open to: http://localhost:8501
+
+================================================================================
+                    STEP 6: USING THE APPLICATION
+================================================================================
+
+Features:
+---------
+✅ Sidebar toggle button (☰) - Click to show/hide sidebar
+✅ New Chat - Create a new conversation
+✅ Settings (⚙️) - Change model, temperature, or clear all chats
+✅ Search - Find conversations by title or content
+✅ Delete (🗑) - Remove individual conversations
+✅ Auto-naming - Chats automatically get titles from first message
+
+Selecting Models:
+-----------------
+1. Click the Settings icon (⚙️) in the sidebar
+2. Select from: llama3.2, mistral, or codellama
+3. Adjust temperature (0.0 = focused, 2.0 = creative)
+4. Start chatting!
+
+================================================================================
+                    TROUBLESHOOTING
+================================================================================
+
+Problem: "Backend connection failed"
+Solution:
+    - Ensure backend.py is running (Terminal 1)
+    - Check http://localhost:8000/health in your browser
+    - Restart backend: Ctrl+C, then run "python backend.py" again
+
+Problem: "Ollama not found"
+Solution:
+    - Ensure Ollama is installed and running
+    - Windows: Check Task Manager for "ollama" process
+    - Restart Ollama: Search "Ollama" in Start menu and launch it
+    - Check: http://localhost:11434 in browser (should show "Ollama is running")
+
+Problem: "Model not found"
+Solution:
+    - Pull the model: ollama pull llama3.2
+    - Check installed models: ollama list
+    - Restart backend after pulling models
+
+Problem: Sidebar not visible
+Solution:
+    - Click the hamburger button (☰) in top-left corner
+    - Refresh the browser (F5)
+    - Clear browser cache: Ctrl+Shift+Delete
+
+Problem: Slow responses
+Solution:
+    - Use smaller models (llama3.2 is faster than llama3.1)
+    - Lower temperature in Settings
+    - Ensure no other heavy applications are running
+    - Check CPU/GPU usage in Task Manager
+
+================================================================================
+                    ARCHITECTURE
+================================================================================
+
+Component Flow:
+---------------
+User Input → Streamlit UI (app_unified.py)
+    ↓
+FastAPI Backend (backend.py)
+    ↓
+Ollama API (localhost:11434)
+    ↓
+LLM Model Processing
+    ↓
+Streamed Response → FastAPI → Streamlit → User Display
+
+Ports Used:
+-----------
+- 8501: Streamlit UI
+- 8000: FastAPI Backend
+- 11434: Ollama Service
+
+Data Storage:
+-------------
+- Session state: In-memory (resets on app restart)
+- Chat threads: Stored in st.session_state.chat_threads
+- No database required (can be added for persistence)
+
+================================================================================
+                    ADVANCED CONFIGURATION
+================================================================================
+
+Changing Backend Port:
+----------------------
+In backend.py, modify the last line:
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+Change 8000 to your desired port.
+
+In app_unified.py, update the URL in call_ollama_backend():
+    "http://localhost:8000/api/chat"
+
+Adding More Models:
+-------------------
+1. Pull model: ollama pull <model-name>
+2. Add to Settings in app_unified.py:
+   model_choice = st.selectbox("Model", ["llama3.2", "mistral", "your-model"])
+
+Customizing Theme:
+------------------
+Edit the CSS section in app_unified.py (lines 16-360):
+- Background color: #0f1116
+- Sidebar gradient: #000000 to #0a0a0a
+- Accent color: #2563eb (blue)
+
+================================================================================
+                    STOPPING THE APPLICATION
+================================================================================
+
+1. Stop Streamlit (Terminal 2):
+   Press Ctrl+C
+
+2. Stop Backend (Terminal 1):
+   Press Ctrl+C
+
+3. Stop Ollama (Optional):
+   - Windows: Task Manager → Find "ollama" → End Task
+   - Or let it run in background (uses minimal resources when idle)
+
+================================================================================
+                    QUICK START COMMANDS
+================================================================================
+
+# Full startup sequence:
+cd c:\Projects\WebUI_Streamlit
+
+# Terminal 1 - Backend:
+python backend.py
+
+# Terminal 2 - Frontend:
+streamlit run app_unified.py
+
+# That's it! Your browser will open automatically.
+
+================================================================================
+                    SUPPORT & RESOURCES
+================================================================================
+
+Ollama Documentation: https://github.com/ollama/ollama
+Streamlit Docs: https://docs.streamlit.io
+FastAPI Docs: https://fastapi.tiangolo.com
+
+Common Issues:
+- GitHub Issues: https://github.com/ollama/ollama/issues
+- Streamlit Forum: https://discuss.streamlit.io
+
+================================================================================
+                    VERSION INFORMATION
+================================================================================
+
+Created: December 10, 2025
+Python: 3.8+
+Streamlit: Latest
+FastAPI: Latest
+Ollama: Latest
+
+================================================================================
