@@ -3,204 +3,125 @@ FastAPI Backend for Ollama UI
 This server connects the Streamlit frontend to Ollama for LLM inference.
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.responses import StreamingResponse
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 import requests
 import json
 import logging
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("backend")
 
-# Initialize FastAPI app
-app = FastAPI(title="Ollama Backend API", version="1.0.0")
-
-# Enable CORS for Streamlit frontend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app = FastAPI()
 
 # Configuration
-OLLAMA_BASE_URL = "http://localhost:11434"
-OLLAMA_GENERATE_ENDPOINT = f"{OLLAMA_BASE_URL}/api/generate"
+OLLAMA_API_URL = "http://localhost:11434/api/chat"
+OLLAMA_TAGS_URL = "http://localhost:11434/api/tags"
+EXPECTED_API_KEY = "77d9e9492a0645e197fe948e3d24da4c.tC3UJDhc1Ol_O3wjAZpoj_nP"
 
-# Request model
-class ChatRequest(BaseModel):
-    message: str
-    conversation_id: str
-    model: str = "llama3.2"
-    temperature: float = 0.7
-    max_tokens: int = 2000
+@app.get("/api/models")
+async def get_models(authorization: str = Header(None)):
+    # Validate API Key
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    token = authorization.split(" ")[1]
+    if token != EXPECTED_API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid API Key")
 
-# Health check endpoint
-@app.get("/health")
-async def health_check():
-    """Check if backend and Ollama are running."""
     try:
-        # Check Ollama connectivity
-        response = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=2)
-        ollama_status = "running" if response.status_code == 200 else "error"
+        logger.info("Fetching available models from Ollama...")
+        response = requests.get(OLLAMA_TAGS_URL, timeout=5)
         
-        return {
-            "status": "healthy",
-            "backend": "running",
-            "ollama": ollama_status,
-            "ollama_url": OLLAMA_BASE_URL
-        }
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Ollama connection failed: {e}")
-        return {
-            "status": "degraded",
-            "backend": "running",
-            "ollama": "unreachable",
-            "error": str(e)
-        }
-
-# List available models
-@app.get("/models")
-async def list_models():
-    """Get list of available Ollama models."""
-    try:
-        response = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=5)
         if response.status_code == 200:
             data = response.json()
-            models = [model["name"] for model in data.get("models", [])]
+            # Extract model names (e.g., "llama3.2:latest")
+            models = [m["name"] for m in data.get("models", [])]
             return {"models": models}
-        else:
-            raise HTTPException(status_code=500, detail="Failed to fetch models from Ollama")
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error fetching models: {e}")
-        raise HTTPException(status_code=503, detail=f"Ollama service unavailable: {str(e)}")
+        
+        logger.error(f"Ollama tags endpoint returned {response.status_code}")
+        return {"models": []}
+    except Exception as e:
+        logger.error(f"Failed to fetch models: {e}")
+        return {"models": []}
 
-# Main chat endpoint with streaming
 @app.post("/api/chat")
-async def chat(request: ChatRequest):
-    """
-    Stream chat responses from Ollama.
-    Uses Server-Sent Events (SSE) for real-time streaming.
-    """
-    logger.info(f"Chat request - Model: {request.model}, Conversation: {request.conversation_id}")
+async def chat(request: Request, authorization: str = Header(None)):
+    # 1. Validate API Key
+    if not authorization or not authorization.startswith("Bearer "):
+        logger.warning("Missing or invalid Authorization header")
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
     
-    # Prepare request payload for Ollama
-    payload = {
-        "model": request.model,
-        "prompt": request.message,
-        "stream": True,
-        "options": {
-            "temperature": request.temperature,
-            "num_predict": request.max_tokens,
-        }
+    token = authorization.split(" ")[1]
+    if token != EXPECTED_API_KEY:
+        logger.warning("Invalid API Key")
+        raise HTTPException(status_code=403, detail="Invalid API Key")
+
+    # 2. Parse Request
+    data = await request.json()
+    user_message = data.get("message")
+    model = data.get("model", "llama3.2")
+    conversation_id = data.get("conversation_id")
+    
+    logger.info(f"Received chat request for model: {model}")
+
+    # 3. Prepare Payload for Ollama
+    ollama_payload = {
+        "model": model,
+        "messages": [{"role": "user", "content": user_message}],
+        "stream": True
     }
-    
-    async def generate_stream():
-        """Generator function for streaming responses."""
-        try:
-            # Make streaming request to Ollama
-            with requests.post(
-                OLLAMA_GENERATE_ENDPOINT,
-                json=payload,
-                stream=True,
-                timeout=120
-            ) as response:
-                
-                if response.status_code != 200:
-                    error_msg = f"Ollama API error: {response.status_code}"
-                    logger.error(error_msg)
-                    yield f"data: {json.dumps({'type': 'error', 'content': error_msg})}\n\n"
-                    return
-                
-                # Stream chunks from Ollama
-                for line in response.iter_lines():
-                    if line:
-                        try:
-                            # Parse JSON response from Ollama
-                            chunk_data = json.loads(line.decode('utf-8'))
+
+    try:
+        # 4. Call Ollama (Streamed)
+        logger.info(f"Forwarding request to Ollama: {OLLAMA_API_URL}")
+        # Increased timeout to 120s because loading a model into RAM can take time
+        response = requests.post(OLLAMA_API_URL, json=ollama_payload, stream=True, timeout=120)
+        
+        # Check if Ollama rejected the request immediately (e.g. Model not found)
+        if response.status_code != 200:
+            error_text = response.text
+            logger.error(f"Ollama returned error {response.status_code}: {error_text}")
+            raise HTTPException(status_code=response.status_code, detail=f"Ollama Error: {error_text}")
+
+        def iter_content():
+            chunk_count = 0
+            for line in response.iter_lines():
+                if line:
+                    try:
+                        # Parse Ollama's JSON response
+                        json_line = json.loads(line)
+                        
+                        # Check for explicit error in the stream
+                        if "error" in json_line:
+                            error_msg = json_line["error"]
+                            logger.error(f"Ollama stream error: {error_msg}")
+                            yield f"data: {json.dumps({'type': 'error', 'content': error_msg})}\n\n"
+                            break
+
+                        content = json_line.get("message", {}).get("content", "")
+                        done = json_line.get("done", False)
+                        
+                        if content:
+                            chunk_count += 1
+                            chunk = json.dumps({"type": "chunk", "content": content})
+                            yield f"data: {chunk}\n\n"
                             
-                            # Extract the generated text
-                            if "response" in chunk_data:
-                                text_chunk = chunk_data["response"]
-                                
-                                # Send chunk to frontend
-                                sse_data = {
-                                    "type": "chunk",
-                                    "content": text_chunk,
-                                    "done": chunk_data.get("done", False)
-                                }
-                                yield f"data: {json.dumps(sse_data)}\n\n"
-                                
-                                # Break if generation is complete
-                                if chunk_data.get("done", False):
-                                    logger.info("Stream completed successfully")
-                                    break
-                                    
-                        except json.JSONDecodeError as e:
-                            logger.error(f"JSON decode error: {e}")
-                            continue
-                        except Exception as e:
-                            logger.error(f"Error processing chunk: {e}")
-                            continue
-                
-        except requests.exceptions.Timeout:
-            error_msg = "Request timed out. Please try again."
-            logger.error(error_msg)
-            yield f"data: {json.dumps({'type': 'error', 'content': error_msg})}\n\n"
+                        if done:
+                            logger.info(f"Stream complete. Sent {chunk_count} chunks.")
+                            break
+                    except ValueError:
+                        continue
             
-        except requests.exceptions.RequestException as e:
-            error_msg = f"Connection error: {str(e)}"
-            logger.error(error_msg)
-            yield f"data: {json.dumps({'type': 'error', 'content': error_msg})}\n\n"
-            
-        except Exception as e:
-            error_msg = f"Unexpected error: {str(e)}"
-            logger.error(error_msg)
-            yield f"data: {json.dumps({'type': 'error', 'content': error_msg})}\n\n"
-    
-    # Return streaming response
-    return StreamingResponse(
-        generate_stream(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"
-        }
-    )
+            if chunk_count == 0:
+                logger.warning("Ollama returned 200 OK but no content chunks were yielded.")
 
-# Root endpoint
-@app.get("/")
-async def root():
-    """Root endpoint with API information."""
-    return {
-        "name": "Ollama Backend API",
-        "version": "1.0.0",
-        "status": "running",
-        "endpoints": {
-            "health": "/health",
-            "models": "/models",
-            "chat": "/api/chat (POST)"
-        },
-        "ollama_url": OLLAMA_BASE_URL
-    }
+        return StreamingResponse(iter_content(), media_type="text/event-stream")
 
-# Run the server
-if __name__ == "__main__":
-    import uvicorn
-    
-    logger.info("=" * 60)
-    logger.info("Starting Ollama Backend Server")
-    logger.info("=" * 60)
-    logger.info(f"Backend URL: http://127.0.0.1:8000")
-    logger.info(f"Ollama backend running at: {OLLAMA_BASE_URL}")
-    logger.info(f"Health check: http://127.0.0.1:8000/health")
-    logger.info(f"Available models: http://127.0.0.1:8000/models")
-    logger.info("=" * 60)
-    
-    # Start server
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    except requests.exceptions.ConnectionError:
+        logger.error("Could not connect to Ollama")
+        raise HTTPException(status_code=503, detail="Ollama is not running. Run 'ollama serve'.")
+    except requests.exceptions.ReadTimeout:
+        logger.error("Ollama timed out")
+        raise HTTPException(status_code=504, detail="Ollama timed out loading the model.")

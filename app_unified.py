@@ -3,368 +3,17 @@ import streamlit.components.v1 as components
 import uuid
 from datetime import datetime
 import time
+import random
 
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(
-    page_title="Ollama UI Replica",
-    page_icon="🦙",
+    page_title="Code Geni AI",
+    page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# --- 2. CUSTOM CSS (VISUAL REPLICA) ---
-# This CSS transforms Streamlit to look like the dark app screenshots
-st.markdown("""
-<style>
-    /* IMPORT FONT */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
-
-    /* GLOBAL RESET & DARK THEME */
-    html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif;
-    }
-    
-    .stApp {
-        background-color: #0f1116; /* Your Deep Dark Background */
-        color: #ececec;
-    }
-
-    /* HIDE STREAMLIT CHROME */
-    header[data-testid="stHeader"] {display: none;}
-    footer {display: none;}
-    #MainMenu {visibility: hidden;}
-    
-    /* SIDEBAR STYLING - Enhanced Modern Design */
-    section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #000000 0%, #0a0a0a 100%) !important;
-        border-right: 1px solid #2a2a2a !important;
-        box-shadow: 4px 0 20px rgba(0,0,0,0.5) !important;
-        position: relative !important;
-        z-index: 999 !important;
-        display: block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        transform: translateX(0) !important;
-        min-width: 280px !important;
-        width: 300px !important;
-    }
-    
-    /* Sidebar content wrapper */
-    section[data-testid="stSidebar"] > div {
-        background: transparent !important;
-        padding-top: 2rem !important;
-    }
-    
-    /* Sidebar scrollbar styling */
-    section[data-testid="stSidebar"] ::-webkit-scrollbar {
-        width: 8px;
-    }
-    
-    section[data-testid="stSidebar"] ::-webkit-scrollbar-track {
-        background: #0a0a0a;
-    }
-    
-    section[data-testid="stSidebar"] ::-webkit-scrollbar-thumb {
-        background: #333;
-        border-radius: 4px;
-    }
-    
-    section[data-testid="stSidebar"] ::-webkit-scrollbar-thumb:hover {
-        background: #444;
-    }
-    
-    /* Sidebar buttons styling */
-    section[data-testid="stSidebar"] .stButton > button {
-        background: linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%) !important;
-        color: #fff !important;
-        border: 1px solid #333 !important;
-        border-radius: 8px !important;
-        padding: 0.6rem 1rem !important;
-        font-weight: 500 !important;
-        transition: all 0.3s ease !important;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
-    }
-    
-    section[data-testid="stSidebar"] .stButton > button:hover {
-        background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%) !important;
-        border-color: #444 !important;
-        transform: translateY(-2px) !important;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.4) !important;
-    }
-    
-    /* Primary button (active/new chat) */
-    section[data-testid="stSidebar"] .stButton > button[kind="primary"] {
-        background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%) !important;
-        border-color: #1e40af !important;
-        box-shadow: 0 2px 12px rgba(37, 99, 235, 0.3) !important;
-    }
-    
-    section[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {
-        background: linear-gradient(135deg, #1d4ed8 0%, #1e3a8a 100%) !important;
-        box-shadow: 0 4px 16px rgba(37, 99, 235, 0.5) !important;
-    }
-    
-    /* Sidebar text input */
-    section[data-testid="stSidebar"] .stTextInput > div > div > input {
-        background-color: #1a1a1a !important;
-        border: 1px solid #333 !important;
-        border-radius: 8px !important;
-        color: #fff !important;
-        padding: 0.6rem 1rem !important;
-    }
-    
-    section[data-testid="stSidebar"] .stTextInput > div > div > input:focus {
-        border-color: #2563eb !important;
-        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2) !important;
-    }
-    
-    /* Sidebar popover */
-    section[data-testid="stSidebar"] [data-testid="stPopover"] {
-        background: transparent !important;
-    }
-    
-    section[data-testid="stSidebar"] [data-testid="stPopover"] > button {
-        background: #1a1a1a !important;
-        border: 1px solid #333 !important;
-        color: #999 !important;
-        padding: 0.4rem 0.6rem !important;
-        border-radius: 6px !important;
-    }
-    
-    section[data-testid="stSidebar"] [data-testid="stPopover"] > button:hover {
-        background: #2a2a2a !important;
-        color: #fff !important;
-        border-color: #444 !important;
-    }
-    
-    /* History button group styling */
-    .history-button-group {
-        display: flex;
-        flex-direction: column;
-        gap: 0.3rem;
-        margin-top: 0.5rem;
-    }
-    
-    .history-entry {
-        position: relative;
-        display: flex;
-        width: 100%;
-        gap: 0.4rem;
-        align-items: stretch;
-    }
-    
-    .history-entry [data-testid="column"] {
-        padding: 0 !important;
-        display: flex;
-        align-items: stretch;
-    }
-    
-    .history-entry [data-testid="column"]:first-child {
-        flex: 1 1 auto;
-    }
-    
-    .history-entry [data-testid="column"]:first-child button {
-        width: 100% !important;
-    }
-    
-    .history-entry [data-testid="column"]:last-child {
-        flex: 0 0 auto;
-    }
-    
-    .history-entry .delete-button {
-        display: flex;
-        justify-content: flex-end;
-    }
-    
-    .history-entry .delete-button button {
-        width: 40px !important;
-        height: 40px !important;
-        min-width: 40px !important;
-        border-radius: 0.8rem !important;
-        border: 1px solid var(--border-color, #333) !important;
-        background: rgba(255, 50, 50, 0.1) !important;
-        color: #ff6b6b !important;
-        padding: 0 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        transition: all 0.2s ease !important;
-    }
-    
-    .history-entry:hover .delete-button button {
-        background: rgba(255, 50, 50, 0.2) !important;
-        border-color: #ff6b6b !important;
-    }
-    
-    .history-entry .delete-button button:hover {
-        background: rgba(255, 50, 50, 0.3) !important;
-        transform: scale(1.05) !important;
-    }
-    
-    /* SIDEBAR SEARCH BAR */
-    .sidebar-search {
-        background-color: #1a1a1a;
-        border: 1px solid #333;
-        border-radius: 8px;
-        padding: 8px 12px;
-        margin-bottom: 10px;
-        color: #fff;
-        width: 100%;
-    }
-    
-    /* SIDEBAR SECTION HEADERS */
-    .sidebar-section {
-        color: #999;
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin: 20px 0 10px 0;
-        font-weight: 600;
-    }
-    
-    /* CHAT ITEM STYLING */
-    .chat-item {
-        background-color: transparent;
-        padding: 10px 12px;
-        border-radius: 8px;
-        margin-bottom: 4px;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    .chat-item:hover {
-        background-color: #1a1a1a;
-    }
-    .chat-item.active {
-        background-color: #2a2a2a;
-        border-left: 3px solid #3b82f6;
-    }
-    .chat-item-actions {
-        display: none;
-        gap: 8px;
-    }
-    .chat-item:hover .chat-item-actions {
-        display: flex;
-    }
-    
-    /* NEW CHAT BUTTON */
-    .new-chat-btn-container {
-        margin-bottom: 20px;
-    }
-    div.stButton > button {
-        background-color: transparent;
-        border: 1px solid #333;
-        color: #fff;
-        border-radius: 8px;
-        text-align: left;
-        width: 100%;
-        transition: background 0.2s;
-    }
-    div.stButton > button:hover {
-        background-color: #1a1a1a;
-        border-color: #555;
-    }
-    
-    /* MAIN CHAT AREA LAYOUT */
-    .block-container {
-        padding-top: 2rem;
-        padding-bottom: 8rem; /* Space for fixed input */
-        max-width: 850px;
-    }
-
-    /* WELCOME SCREEN */
-    .welcome-container {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        height: 60vh;
-        color: #888;
-        animation: fadeIn 0.5s ease-in;
-    }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-    /* MESSAGE STYLING */
-    /* User: Dark Grey Bubble, Right Aligned */
-    .user-msg-container {
-        display: flex;
-        justify-content: flex-end;
-        margin-bottom: 15px;
-    }
-    .user-msg-bubble {
-        background-color: #212121; /* Dark grey bubble */
-        color: white;
-        padding: 10px 18px;
-        border-radius: 20px;
-        max-width: 80%;
-        font-size: 1rem;
-        line-height: 1.5;
-    }
-    
-    /* AI: Transparent, Left Aligned (No bubble, just text) */
-    .ai-msg-container {
-        display: flex;
-        justify-content: flex-start;
-        margin-bottom: 25px;
-        padding-right: 10%;
-    }
-    .ai-avatar {
-        width: 32px;
-        height: 32px;
-        margin-right: 15px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 20px;
-    }
-    .ai-text {
-        color: #ececec;
-        font-size: 1rem;
-        line-height: 1.6;
-        margin-top: 4px;
-    }
-
-    /* FLOATING INPUT BAR STYLING */
-    /* We target the stChatInput container to make it float */
-    div[data-testid="stChatInput"] {
-        position: fixed;
-        bottom: 30px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 100%;
-        max-width: 750px; /* Limit width like the screenshot */
-        z-index: 1000;
-    }
-    
-    div[data-testid="stChatInput"] > div {
-        background-color: #1e1e1e; /* Input pill color */
-        border-radius: 25px;
-        border: 1px solid #333;
-        padding: 5px 10px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-    }
-    
-    div[data-testid="stChatInput"] textarea {
-        background-color: transparent !important;
-        color: white !important;
-    }
-
-    /* POPOVER MENU STYLING (Sidebar History) */
-    div[data-testid="stPopover"] > button {
-        border: none;
-        padding: 8px 10px;
-        color: #999;
-    }
-    div[data-testid="stPopover"] > button:hover {
-        background-color: #111;
-        color: white;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# --- 3. SESSION STATE LOGIC ---
+# --- 2. SESSION STATE LOGIC ---
 
 # Initialize logic derived from your code
 if "chat_threads" not in st.session_state:
@@ -380,6 +29,17 @@ if "active_thread_id" not in st.session_state:
         "created": datetime.now()
     })
     st.session_state.active_thread_id = new_id
+
+# Initialize Settings State
+if "settings" not in st.session_state:
+    st.session_state.settings = {
+        "model": "llama3.2",
+        "temperature": 0.7,
+        "font_size": "Medium",
+        "particles": False,
+        "user_name": "You",
+        "ai_name": "Code Geni"
+    }
 
 # Helper Functions
 def get_active_thread():
@@ -434,40 +94,496 @@ def generate_title(text):
     # Limit to 40 characters
     return title[:40] + "..." if len(title) > 40 else title
 
+@st.cache_data(ttl=60)
+def get_available_models():
+    """Fetch available models from the backend (cached for 60 seconds)."""
+    import requests
+    API_KEY = "77d9e9492a0645e197fe948e3d24da4c.tC3UJDhc1Ol_O3wjAZpoj_nP"
+    try:
+        headers = {"Authorization": f"Bearer {API_KEY}"}
+        # Short timeout so UI doesn't freeze if backend is down
+        response = requests.get("http://localhost:8000/api/models", headers=headers, timeout=2)
+        if response.status_code == 200:
+            return response.json().get("models", [])
+    except:
+        pass
+    return []
+
 def call_ollama_backend(prompt: str, conversation_id: str, model: str = "llama3.2") -> str:
-    """Call FastAPI backend with Ollama integration."""
+    """Call FastAPI backend with Ollama integration or fallback to Mock."""
     import requests
     import json
     
+    # API Key Configuration
+    API_KEY = "77d9e9492a0645e197fe948e3d24da4c.tC3UJDhc1Ol_O3wjAZpoj_nP"
+
+    # Mock Mode Check (for demo consistency)
+    if model == "Mock Mode (Demo)":
+        time.sleep(1.2) # Simulate latency
+        responses = [
+            "That's an interesting question! As Code Geni, I can help you structure that code.",
+            "I can certainly help with that. Here is a breakdown of how this architecture works...",
+            "Could you provide more details? I want to make sure I generate the perfect snippet for you.",
+            "Here's a Python example that demonstrates this concept:\n\n```python\ndef hello_world():\n    print('Hello Code Geni!')\n```",
+            "I'm currently running in Demo Mode, but I'm fully operational to help you design your UI."
+        ]
+        return random.choice(responses)
+
     try:
+        # Added Headers with API Key
+        headers = {
+            "Authorization": f"Bearer {API_KEY}",
+            "Content-Type": "application/json"
+        }
+
         response = requests.post(
             "http://localhost:8000/api/chat",
+            headers=headers,
             json={
                 "message": prompt,
                 "conversation_id": conversation_id,
                 "model": model
             },
             stream=True,
-            timeout=120
+            timeout=120 # Increased timeout for model loading
         )
         
         if response.status_code == 200:
             full_response = []
-            for line in response.iter_lines():
-                if line:
+            
+            # Check content type to decide how to parse
+            content_type = response.headers.get('Content-Type', '')
+            
+            if 'text/event-stream' in content_type:
+                # Handle SSE Stream
+                for line in response.iter_lines():
+                    if not line:
+                        continue
                     try:
-                        line_str = line.decode('utf-8')
-                        if line_str.startswith('data: '):
-                            data = json.loads(line_str[6:])
+                        line_str = line.decode('utf-8').strip()
+                        if line_str.startswith('data:'):
+                            # Handle 'data: ' and 'data:'
+                            json_str = line_str[5:].strip()
+                            data = json.loads(json_str)
+                            
                             if data.get('type') == 'chunk':
                                 full_response.append(data.get('content', ''))
+                            elif data.get('type') == 'error':
+                                return f"⚠️ Ollama Error: {data.get('content')}"
+                                
                     except (json.JSONDecodeError, UnicodeDecodeError):
                         continue
-            return "".join(full_response) if full_response else None
-        return None
+            else:
+                # Handle standard JSON response (fallback)
+                try:
+                    data = response.json()
+                    if isinstance(data, dict) and 'content' in data:
+                        return data['content']
+                    # If it's just raw text
+                    full_response.append(response.text)
+                except:
+                    full_response.append(response.text)
+            
+            result = "".join(full_response)
+            if not result:
+                return (
+                    "⚠️ The backend returned an empty response.\n\n"
+                    "**Troubleshooting:**\n"
+                    "1. Ensure Ollama is running (`ollama serve`).\n"
+                    f"2. Ensure the model '{model}' is downloaded (`ollama pull {model}`).\n"
+                    "3. Check the terminal running `backend.py` for error logs."
+                )
+                
+            return result
+        
+        # Handle HTTP Errors
+        try:
+            error_msg = response.json().get("detail", response.text)
+        except:
+            error_msg = response.text
+        return f"⚠️ Backend Error ({response.status_code}): {error_msg}"
+
     except Exception as e:
-        st.warning(f"Backend connection failed: {e}")
-        return None
+        return f"Backend unavailable ({str(e)}). Ensure backend.py is running on port 8000."
+
+# --- 3. CUSTOM CSS (VISUAL REPLICA) ---
+# Dynamic Font Size Logic
+font_size_map = {"Small": "14px", "Medium": "16px", "Large": "18px"}
+current_font_size = font_size_map.get(st.session_state.settings["font_size"], "16px")
+
+# Particle CSS (Simple CSS animation)
+particle_css = ""
+if st.session_state.settings["particles"]:
+    particle_css = """
+    .stApp::before {
+        content: "";
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background-image: radial-gradient(#3b82f6 1px, transparent 1px), radial-gradient(#3b82f6 1px, transparent 1px);
+        background-size: 40px 40px;
+        background-position: 0 0, 20px 20px;
+        opacity: 0.05;
+        z-index: -1;
+        pointer-events: none;
+    }
+    """
+
+# This CSS transforms Streamlit to look like the dark app screenshots
+st.markdown(f"""
+<style>
+    /* IMPORT FONT */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+    /* GLOBAL RESET & DARK THEME */
+    html, body, [class*="css"] {{
+        font-family: 'Inter', sans-serif;
+        font-size: {current_font_size};
+    }}
+    
+    {particle_css}
+    
+    .stApp {{
+        background-color: #0f1116; /* Your Deep Dark Background */
+        color: #ececec;
+    }}
+
+    /* HIDE STREAMLIT CHROME */
+    header[data-testid="stHeader"] {{display: none;}}
+    footer {{display: none;}}
+    #MainMenu {{visibility: hidden;}}
+    
+    /* SIDEBAR STYLING - Enhanced Modern Design */
+    section[data-testid="stSidebar"] {{
+        background: linear-gradient(180deg, #000000 0%, #0a0a0a 100%) !important;
+        border-right: 1px solid #2a2a2a !important;
+        box-shadow: 4px 0 20px rgba(0,0,0,0.5) !important;
+        position: relative !important;
+        z-index: 999 !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        transform: translateX(0) !important;
+        min-width: 280px !important;
+        width: 300px !important;
+    }}
+    
+    /* Sidebar content wrapper */
+    section[data-testid="stSidebar"] > div {{
+        background: transparent !important;
+        padding-top: 2rem !important;
+    }}
+    
+    /* Sidebar scrollbar styling */
+    section[data-testid="stSidebar"] ::-webkit-scrollbar {{
+        width: 8px;
+    }}
+    
+    section[data-testid="stSidebar"] ::-webkit-scrollbar-track {{
+        background: #0a0a0a;
+    }}
+    
+    section[data-testid="stSidebar"] ::-webkit-scrollbar-thumb {{
+        background: #333;
+        border-radius: 4px;
+    }}
+    
+    section[data-testid="stSidebar"] ::-webkit-scrollbar-thumb:hover {{
+        background: #444;
+    }}
+    
+    /* Sidebar buttons styling */
+    section[data-testid="stSidebar"] .stButton > button {{
+        background: linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%) !important;
+        color: #fff !important;
+        border: 1px solid #333 !important;
+        border-radius: 8px !important;
+        padding: 0.6rem 1rem !important;
+        font-weight: 500 !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+    }}
+    
+    section[data-testid="stSidebar"] .stButton > button:hover {{
+        background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%) !important;
+        border-color: #444 !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.4) !important;
+    }}
+    
+    /* Primary button (active/new chat) */
+    section[data-testid="stSidebar"] .stButton > button[kind="primary"] {{
+        background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%) !important;
+        border-color: #1e40af !important;
+        box-shadow: 0 2px 12px rgba(37, 99, 235, 0.3) !important;
+    }}
+    
+    section[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {{
+        background: linear-gradient(135deg, #1d4ed8 0%, #1e3a8a 100%) !important;
+        box-shadow: 0 4px 16px rgba(37, 99, 235, 0.5) !important;
+    }}
+    
+    /* Sidebar text input */
+    section[data-testid="stSidebar"] .stTextInput > div > div > input {{
+        background-color: #1a1a1a !important;
+        border: 1px solid #333 !important;
+        border-radius: 8px !important;
+        color: #fff !important;
+        padding: 0.6rem 1rem !important;
+    }}
+    
+    section[data-testid="stSidebar"] .stTextInput > div > div > input:focus {{
+        border-color: #2563eb !important;
+        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2) !important;
+    }}
+    
+    /* Sidebar popover */
+    section[data-testid="stSidebar"] [data-testid="stPopover"] {{
+        background: transparent !important;
+    }}
+    
+    section[data-testid="stSidebar"] [data-testid="stPopover"] > button {{
+        background: #1a1a1a !important;
+        border: 1px solid #333 !important;
+        color: #999 !important;
+        padding: 0.4rem 0.6rem !important;
+        border-radius: 6px !important;
+    }}
+    
+    section[data-testid="stSidebar"] [data-testid="stPopover"] > button:hover {{
+        background: #2a2a2a !important;
+        color: #fff !important;
+        border-color: #444 !important;
+    }}
+    
+    /* History button group styling */
+    .history-button-group {{
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+        margin-top: 0.5rem;
+    }}
+    
+    .history-entry {{
+        position: relative;
+        display: flex;
+        width: 100%;
+        gap: 0.4rem;
+        align-items: stretch;
+    }}
+    
+    .history-entry [data-testid="column"] {{
+        padding: 0 !important;
+        display: flex;
+        align-items: stretch;
+    }}
+    
+    .history-entry [data-testid="column"]:first-child {{
+        flex: 1 1 auto;
+    }}
+    
+    .history-entry [data-testid="column"]:first-child button {{
+        width: 100% !important;
+    }}
+    
+    .history-entry [data-testid="column"]:last-child {{
+        flex: 0 0 auto;
+    }}
+    
+    .history-entry .delete-button {{
+        display: flex;
+        justify-content: flex-end;
+    }}
+    
+    .history-entry .delete-button button {{
+        width: 40px !important;
+        height: 40px !important;
+        min-width: 40px !important;
+        border-radius: 0.8rem !important;
+        border: 1px solid var(--border-color, #333) !important;
+        background: rgba(255, 50, 50, 0.1) !important;
+        color: #ff6b6b !important;
+        padding: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        transition: all 0.2s ease !important;
+    }}
+    
+    .history-entry:hover .delete-button button {{
+        background: rgba(255, 50, 50, 0.2) !important;
+        border-color: #ff6b6b !important;
+    }}
+    
+    .history-entry .delete-button button:hover {{
+        background: rgba(255, 50, 50, 0.3) !important;
+        transform: scale(1.05) !important;
+    }}
+    
+    /* SIDEBAR SEARCH BAR */
+    .sidebar-search {{
+        background-color: #1a1a1a;
+        border: 1px solid #333;
+        border-radius: 8px;
+        padding: 8px 12px;
+        margin-bottom: 10px;
+        color: #fff;
+        width: 100%;
+    }}
+    
+    /* SIDEBAR SECTION HEADERS */
+    .sidebar-section {{
+        color: #999;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin: 20px 0 10px 0;
+        font-weight: 600;
+    }}
+    
+    /* CHAT ITEM STYLING */
+    .chat-item {{
+        background-color: transparent;
+        padding: 10px 12px;
+        border-radius: 8px;
+        margin-bottom: 4px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }}
+    .chat-item:hover {{
+        background-color: #1a1a1a;
+    }}
+    .chat-item.active {{
+        background-color: #2a2a2a;
+        border-left: 3px solid #3b82f6;
+    }}
+    .chat-item-actions {{
+        display: none;
+        gap: 8px;
+    }}
+    .chat-item:hover .chat-item-actions {{
+        display: flex;
+    }}
+    
+    /* NEW CHAT BUTTON */
+    .new-chat-btn-container {{
+        margin-bottom: 20px;
+    }}
+    div.stButton > button {{
+        background-color: transparent;
+        border: 1px solid #333;
+        color: #fff;
+        border-radius: 8px;
+        text-align: left;
+        width: 100%;
+        transition: background 0.2s;
+    }}
+    div.stButton > button:hover {{
+        background-color: #1a1a1a;
+        border-color: #555;
+    }}
+    
+    /* MAIN CHAT AREA LAYOUT */
+    .block-container {{
+        padding-top: 2rem;
+        padding-bottom: 8rem; /* Space for fixed input */
+        max-width: 850px;
+    }}
+
+    /* WELCOME SCREEN */
+    .welcome-container {{
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 60vh;
+        color: #888;
+        animation: fadeIn 0.5s ease-in;
+    }}
+    @keyframes fadeIn {{ from {{ opacity: 0; transform: translateY(10px); }} to {{ opacity: 1; transform: translateY(0); }} }}
+
+    /* MESSAGE STYLING */
+    /* User: Dark Grey Bubble, Right Aligned */
+    .user-msg-container {{
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 15px;
+    }}
+    .user-msg-bubble {{
+        background-color: #212121; /* Dark grey bubble */
+        color: white;
+        padding: 10px 18px;
+        border-radius: 20px;
+        max-width: 80%;
+        font-size: 1rem;
+        line-height: 1.5;
+    }}
+    
+    /* AI: Transparent, Left Aligned (No bubble, just text) */
+    .ai-msg-container {{
+        display: flex;
+        justify-content: flex-start;
+        margin-bottom: 25px;
+        padding-right: 10%;
+    }}
+    .ai-avatar {{
+        width: 32px;
+        height: 32px;
+        margin-right: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        background: #1e40af; /* Blue background for AI */
+        border-radius: 50%;
+        color: white;
+    }}
+    .ai-text {{
+        color: #ececec;
+        font-size: 1rem;
+        line-height: 1.6;
+        margin-top: 4px;
+    }}
+
+    /* FLOATING INPUT BAR STYLING */
+    /* We target the stChatInput container to make it float */
+    div[data-testid="stChatInput"] {{
+        position: fixed;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 100%;
+        max-width: 750px; /* Limit width like the screenshot */
+        z-index: 1000;
+    }}
+    
+    div[data-testid="stChatInput"] > div {{
+        background-color: #1e1e1e; /* Input pill color */
+        border-radius: 25px;
+        border: 1px solid #333;
+        padding: 5px 10px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }}
+    
+    div[data-testid="stChatInput"] textarea {{
+        background-color: transparent !important;
+        color: white !important;
+    }}
+
+    /* POPOVER MENU STYLING (Sidebar History) */
+    div[data-testid="stPopover"] > button {{
+        border: none;
+        padding: 8px 10px;
+        color: #999;
+    }}
+    div[data-testid="stPopover"] > button:hover {{
+        background-color: #111;
+        color: white;
+    }}
+</style>
+""", unsafe_allow_html=True)
 
 # --- 4. SIDEBAR WITH CHATGPT-STYLE UI ---
 
@@ -588,8 +704,8 @@ with st.sidebar:
     st.markdown("""
         <div style='text-align: center; padding: 1rem 0; margin-bottom: 1rem; border-bottom: 1px solid #222;'>
             <h2 style='color: #fff; font-size: 1.5rem; margin: 0; display: flex; align-items: center; justify-content: center; gap: 10px;'>
-                <span style='font-size: 2rem;'>🦙</span>
-                <span>Ollama Chat</span>
+                <span style='font-size: 1.8rem;'>🤖</span>
+                <span>Code Geni AI</span>
             </h2>
         </div>
     """, unsafe_allow_html=True)
@@ -603,10 +719,54 @@ with st.sidebar:
     with col_set:
         with st.popover("⚙️", use_container_width=True):
             st.markdown("### ⚙️ Settings")
-            model_choice = st.selectbox("Model", ["llama3.2", "mistral", "codellama"], key="model_select")
-            temperature = st.slider("Temperature", 0.0, 2.0, 0.7, key="temp_slider")
+            
+            # Model Selection
+            # 1. Try to get models from backend
+            detected_models = get_available_models()
+            
+            # 2. Define options
+            if detected_models:
+                # If backend is running, use real models + Mock
+                model_options = detected_models + ["Mock Mode (Demo)"]
+            else:
+                # Fallback if backend is down
+                model_options = ["llama3.2", "mistral", "codellama", "Mock Mode (Demo)"]
+
+            # 3. Ensure current selection is valid
+            current_index = 0
+            if st.session_state.settings["model"] in model_options:
+                current_index = model_options.index(st.session_state.settings["model"])
+
+            st.session_state.settings["model"] = st.selectbox(
+                "Model", 
+                model_options, 
+                index=current_index,
+                key="model_select"
+            )
+            
+            # Temperature
+            st.session_state.settings["temperature"] = st.slider(
+                "Temperature", 0.0, 2.0, st.session_state.settings["temperature"], key="temp_slider"
+            )
+            
             st.markdown("---")
-            st.caption("Theme: Dark Mode")
+            st.markdown("### 🎨 Appearance")
+            
+            # Font Size
+            st.session_state.settings["font_size"] = st.select_slider(
+                "Font Size", options=["Small", "Medium", "Large"], value=st.session_state.settings["font_size"], key="font_select"
+            )
+            
+            # Particles Toggle
+            st.session_state.settings["particles"] = st.toggle(
+                "Background Particles", value=st.session_state.settings["particles"], key="particles_toggle"
+            )
+            
+            # Avatar Names
+            st.session_state.settings["user_name"] = st.text_input("User Name", value=st.session_state.settings["user_name"])
+            st.session_state.settings["ai_name"] = st.text_input("AI Name", value=st.session_state.settings["ai_name"])
+
+            st.markdown("---")
             if st.button("Clear All Chats", type="primary", key="clear_all_btn"):
                 st.session_state.chat_threads = []
                 create_new_chat()
@@ -694,7 +854,7 @@ with st.sidebar:
     
     # Footer info
     st.markdown("---")
-    st.caption(f"💬 {len(st.session_state.chat_threads)} conversations")
+    st.caption(f"💬 {len(st.session_state.chat_threads)} conversations | v1.0.0")
 
 # --- 5. MAIN CHAT AREA ---
 
@@ -703,15 +863,17 @@ messages = active_thread["messages"]
 
 # A. WELCOME STATE (Empty Chat)
 if not messages:
-    st.markdown("""
+    st.markdown(f"""
         <div class="welcome-container">
-            <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M15 6v14"/>
-                <path d="M9 6v14"/>
-                <rect x="2" y="6" width="20" height="12" rx="4"/>
-                <path d="M6 6V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2"/>
-            </svg>
-            <h2 style="margin-top:20px; font-weight: 500;">How can I assist you today?</h2>
+            <div style="background: linear-gradient(135deg, #2563eb, #1e40af); padding: 20px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(37, 99, 235, 0.3);">
+                <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2a10 10 0 1 0 10 10H12V2z"/>
+                    <path d="M12 12 2.1 12a10.1 10.1 0 0 0 1.6 4.3"/>
+                    <path d="M12 12 16.9 16.9a10 10 0 0 0 4.3-1.6"/>
+                </svg>
+            </div>
+            <h2 style="margin-top:10px; font-weight: 600; font-size: 2rem;">Code Geni AI</h2>
+            <p style="font-size: 1.1rem; opacity: 0.7;">Your intelligent coding companion</p>
         </div>
     """, unsafe_allow_html=True)
 
@@ -722,15 +884,19 @@ else:
             # Render User Message (Right Aligned Bubble)
             st.markdown(f"""
                 <div class="user-msg-container">
-                    <div class="user-msg-bubble">{msg['content']}</div>
+                    <div class="user-msg-bubble">
+                        <div style="font-size: 0.75rem; opacity: 0.6; margin-bottom: 4px;">{st.session_state.settings['user_name']}</div>
+                        {msg['content']}
+                    </div>
                 </div>
             """, unsafe_allow_html=True)
         else:
             # Render AI Message (Left Aligned, Icon + Text)
             st.markdown(f"""
                 <div class="ai-msg-container">
-                    <div class="ai-avatar">🦙</div>
+                    <div class="ai-avatar">🤖</div>
                     <div class="ai-text">
+                        <div style="font-weight: 600; margin-bottom: 4px; color: #3b82f6;">{st.session_state.settings['ai_name']}</div>
                         {msg['content']}
                         <div style="display: flex; gap: 10px; margin-top: 10px; opacity: 0.5; font-size: 0.8rem;">
                             <span>📄 Copy</span> <span>🔄 Regenerate</span>
@@ -742,7 +908,7 @@ else:
 # --- 6. FLOATING INPUT ---
 
 # Uses st.chat_input, but styled via CSS above to look like a floating bar
-user_input = st.chat_input(placeholder="Message Llama...")
+user_input = st.chat_input(placeholder=f"Message {st.session_state.settings['ai_name']}...")
 
 if user_input:
     # 1. Add User Message
@@ -752,20 +918,16 @@ if user_input:
     if len(active_thread["messages"]) == 1:
         rename_thread(active_thread["id"], generate_title(user_input))
 
-    # 3. Get selected model from session state (default to llama3.2)
-    selected_model = st.session_state.get("model_select", "llama3.2")
+    # 3. Get selected model from session state
+    selected_model = st.session_state.settings.get("model", "llama3.2")
     
-    # 4. Call Ollama Backend
-    with st.spinner("Thinking..."):
+    # 4. Call Backend
+    with st.spinner(f"{st.session_state.settings['ai_name']} is thinking..."):
         ai_response = call_ollama_backend(
             prompt=user_input,
             conversation_id=active_thread["id"],
             model=selected_model
         )
-    
-    # Fallback to mock if backend fails
-    if not ai_response:
-        ai_response = "Sometimes that's just the way it is. If you ever want to chat or need help with something, feel free to reach out. (Using mock - backend unavailable)"
     
     # 4. Add AI Message
     active_thread["messages"].append({"role": "assistant", "content": ai_response})
