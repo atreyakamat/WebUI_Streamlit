@@ -6,12 +6,35 @@ import html
 import json
 import time
 import uuid
+import io
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import streamlit as st
 import streamlit.components.v1 as components
 from markdown import markdown as md_to_html
+import os
+import sys
+
+try:
+    from PIL import Image
+    import pytesseract
+    from pdf2image import convert_from_bytes
+    OCR_AVAILABLE = True
+    
+    # Windows: Try to find Tesseract if not in PATH
+    if sys.platform.startswith('win'):
+        possible_paths = [
+            r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+            r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r"Tesseract-OCR\tesseract.exe")
+        ]
+        for p in possible_paths:
+            if os.path.exists(p):
+                pytesseract.pytesseract.tesseract_cmd = p
+                break
+except ImportError:
+    OCR_AVAILABLE = False
 
 st.set_page_config(
     page_title="ChatGPT Replica",
@@ -207,6 +230,21 @@ def inject_global_styles(theme: Dict[str, str]) -> None:
         --label-color: {theme['label']};
         --input-bg: {theme['input_bg']};
         --font-scale: {st.session_state.ui.get('font_scale', 1.0)};
+    }}
+    .message-row.system {{
+        justify-content: center;
+        padding: 0.5rem 0;
+        opacity: 0.7;
+        animation: floatIn 0.4s ease;
+    }}
+    .message-content.system-msg {{
+        font-size: 0.8rem;
+        background: rgba(255, 255, 255, 0.05);
+        padding: 0.4rem 1rem;
+        border-radius: 1rem;
+        font-style: italic;
+        text-align: center;
+        border: 1px dashed var(--border-color);
     }}
     body {{
         font-family: "Space Grotesk", "Segoe UI", sans-serif;
@@ -572,6 +610,39 @@ def inject_client_scripts() -> None:
     )
 
 
+def run_ocr_pipeline(uploaded_file) -> Optional[str]:
+    """Extract text from an uploaded image or PDF using OCR."""
+    if not OCR_AVAILABLE:
+        st.error("OCR libraries not found. Please install `pytesseract` and `pdf2image`.")
+        return None
+
+    try:
+        text = ""
+        uploaded_file.seek(0)
+        
+        if uploaded_file.type == "application/pdf":
+            # Convert PDF to images (requires poppler installed)
+            images = convert_from_bytes(uploaded_file.read())
+            for img in images:
+                text += pytesseract.image_to_string(img) + "\n"
+        else:
+            # Handle images
+            image = Image.open(uploaded_file)
+            text = pytesseract.image_to_string(image)
+        
+        # Cleanup: Normalize whitespace
+        cleaned_text = " ".join(text.split())
+        return cleaned_text
+    except pytesseract.TesseractNotFoundError:
+        st.error("Tesseract is not installed or not in PATH. Please install Tesseract-OCR.")
+        return None
+    except Exception as e:
+        st.error(f"OCR Error: {e}")
+        if "poppler" in str(e).lower():
+             st.info("For PDFs, `poppler` must be installed and in your PATH.")
+        return None
+
+
 def call_custom_llm(prompt_text: str) -> Optional[str]:
     """Hook for integrating a bespoke LLM or API later on."""
 
@@ -637,6 +708,16 @@ def delete_message(message_id: str) -> bool:
 
 def render_message_html(message: Dict[str, str]) -> str:
     role = message.get("role", "assistant")
+    
+    # Handle system messages distinctively
+    if role == "system":
+        content = html.escape(message.get("content", ""))
+        return (
+            f"<div class=\"message-row system\">"
+            f"<div class=\"message-content system-msg\">{content}</div>"
+            "</div>"
+        )
+
     avatar = (
         st.session_state.ui.get("assistant_avatar", "AI")
         if role == "assistant"
@@ -844,6 +925,43 @@ def main() -> None:
     inject_client_scripts()
 
     chat_feed = st.container()
+    
+    # OCR Upload Area (Main Column)
+    if OCR_AVAILABLE:
+        with st.expander("📎 Attach Image/PDF for OCR", expanded=False):
+            uploaded_file = st.file_uploader(
+                "Upload an image or scanned PDF",
+                type=["png", "jpg", "jpeg", "pdf"],
+                accept_multiple_files=False,
+                key="ocr_uploader_main"
+            )
+            
+            if uploaded_file and st.button("Extract & Ask", key="ocr_trigger_main"):
+                with st.spinner("Scanning document..."):
+                    extracted_text = run_ocr_pipeline(uploaded_file)
+                    
+                    if extracted_text:
+                        # 1. Inject system notice
+                        st.session_state.messages.append(create_message(
+                            "system", 
+                            f"System: OCR extracted text from {uploaded_file.name}"
+                        ))
+                        
+                        # 2. Inject the content as user prompt
+                        ocr_prompt = (
+                            "The following text was extracted using OCR from a user-uploaded document.\n"
+                            "The text may contain formatting or recognition errors.\n\n"
+                            f"Extracted Content:\n\"\"\"\n{extracted_text}\n\"\"\"\n"
+                        )
+                        st.session_state.messages.append(create_message("user", ocr_prompt))
+                        
+                        # 3. Generate AI Reply
+                        with st.spinner("Analyzing extracted text..."):
+                            ai_text = generate_ai_reply(ocr_prompt)
+                        
+                        st.session_state.messages.append(create_message("assistant", ai_text))
+                        st.rerun()
+
     user_prompt = st.chat_input("Message ChatGPT", key="chat-input")
 
     if user_prompt:

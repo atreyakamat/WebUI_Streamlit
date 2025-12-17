@@ -4,6 +4,28 @@ import uuid
 from datetime import datetime
 import time
 import random
+import os
+import sys
+
+try:
+    from PIL import Image
+    import pytesseract
+    from pdf2image import convert_from_bytes
+    OCR_AVAILABLE = True
+    
+    # Windows: Try to find Tesseract if not in PATH
+    if sys.platform.startswith('win'):
+        possible_paths = [
+            r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+            r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r"Tesseract-OCR\tesseract.exe")
+        ]
+        for p in possible_paths:
+            if os.path.exists(p):
+                pytesseract.pytesseract.tesseract_cmd = p
+                break
+except ImportError:
+    OCR_AVAILABLE = False
 
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(
@@ -108,6 +130,39 @@ def get_available_models():
     except:
         pass
     return []
+
+def run_ocr_pipeline(uploaded_file):
+    """Extract text from an uploaded image or PDF using OCR."""
+    if not OCR_AVAILABLE:
+        st.error("OCR libraries not found. Please install `pytesseract` and `pdf2image`.")
+        return None
+
+    try:
+        text = ""
+        # Reset file pointer to beginning just in case
+        uploaded_file.seek(0)
+        
+        if uploaded_file.type == "application/pdf":
+            # Convert PDF to images (requires poppler installed)
+            images = convert_from_bytes(uploaded_file.read())
+            for img in images:
+                text += pytesseract.image_to_string(img) + "\n"
+        else:
+            # Handle images
+            image = Image.open(uploaded_file)
+            text = pytesseract.image_to_string(image)
+        
+        # Cleanup: Normalize whitespace
+        cleaned_text = " ".join(text.split())
+        return cleaned_text
+    except pytesseract.TesseractNotFoundError:
+        st.error("Tesseract is not installed or not in PATH. Please install Tesseract-OCR.")
+        return None
+    except Exception as e:
+        st.error(f"OCR Error: {e}")
+        if "poppler" in str(e).lower():
+             st.info("For PDFs, `poppler` must be installed and in your PATH.")
+        return None
 
 def call_ollama_backend(prompt: str, conversation_id: str, model: str = "llama3.2") -> str:
     """Call FastAPI backend with Ollama integration or fallback to Mock."""
@@ -861,6 +916,52 @@ with st.sidebar:
 active_thread = get_active_thread()
 messages = active_thread["messages"]
 
+# OCR UPLOAD IN CHAT AREA (Top Right)
+with st.container():
+    col_header, col_ocr = st.columns([0.85, 0.15])
+    with col_ocr:
+        if OCR_AVAILABLE:
+            with st.popover("📎 OCR", use_container_width=True, help="Upload Image/PDF for Text Extraction"):
+                st.markdown("### 📄 Extract Text")
+                uploaded_file = st.file_uploader(
+                    "Upload", 
+                    type=["png", "jpg", "jpeg", "pdf"], 
+                    key=f"ocr_{active_thread['id']}",
+                    label_visibility="collapsed"
+                )
+                
+                if uploaded_file:
+                    if st.button("Process", key=f"proc_{active_thread['id']}", use_container_width=True):
+                        with st.spinner("🔍 Scanning document..."):
+                            extracted_text = run_ocr_pipeline(uploaded_file)
+                            if extracted_text:
+                                # Inject into chat
+                                active_thread["messages"].append({
+                                    "role": "system", 
+                                    "content": f"📷 Image Processed: {uploaded_file.name}"
+                                })
+                                
+                                ocr_prompt = (
+                                    "The following text was extracted using OCR from a user-uploaded document.\n"
+                                    "The text may contain formatting or recognition errors.\n\n"
+                                    f"Extracted Content:\n\"\"\"\n{extracted_text}\n\"\"\"\n"
+                                    "Please acknowledge receipt of this text and summarize it briefly."
+                                )
+                                
+                                active_thread["messages"].append({"role": "user", "content": ocr_prompt})
+                                
+                                # Trigger AI response
+                                selected_model = st.session_state.settings.get("model", "llama3.2")
+                                ai_response = call_ollama_backend(
+                                    prompt=ocr_prompt,
+                                    conversation_id=active_thread["id"],
+                                    model=selected_model
+                                )
+                                active_thread["messages"].append({"role": "assistant", "content": ai_response})
+                                st.rerun()
+        else:
+            st.caption("OCR Unavailable")
+
 # A. WELCOME STATE (Empty Chat)
 if not messages:
     st.markdown(f"""
@@ -886,6 +987,14 @@ else:
                 <div class="user-msg-container">
                     <div class="user-msg-bubble">
                         <div style="font-size: 0.75rem; opacity: 0.6; margin-bottom: 4px;">{st.session_state.settings['user_name']}</div>
+                        {msg['content']}
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+        elif msg["role"] == "system":
+             st.markdown(f"""
+                <div style="display: flex; justify-content: center; margin-bottom: 15px; opacity: 0.7;">
+                    <div style="font-size: 0.8rem; background: rgba(255, 255, 255, 0.05); padding: 5px 15px; border-radius: 10px; border: 1px dashed #444;">
                         {msg['content']}
                     </div>
                 </div>
