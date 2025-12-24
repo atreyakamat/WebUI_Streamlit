@@ -6,6 +6,8 @@ import time
 import random
 import os
 import sys
+import requests
+import json
 
 try:
     from PIL import Image
@@ -63,6 +65,10 @@ if "settings" not in st.session_state:
         "ai_name": "Code Geni"
     }
 
+# Initialize OCR Context State
+if "ocr_context" not in st.session_state:
+    st.session_state.ocr_context = {"text": None, "filename": None}
+
 # Helper Functions
 def get_active_thread():
     for thread in st.session_state.chat_threads:
@@ -119,15 +125,16 @@ def generate_title(text):
 @st.cache_data(ttl=60)
 def get_available_models():
     """Fetch available models from the backend (cached for 60 seconds)."""
-    import requests
+    # API_KEY is optional for local testing in this setup
     API_KEY = "77d9e9492a0645e197fe948e3d24da4c.tC3UJDhc1Ol_O3wjAZpoj_nP"
     try:
         headers = {"Authorization": f"Bearer {API_KEY}"}
         # Short timeout so UI doesn't freeze if backend is down
-        response = requests.get("http://localhost:8000/api/models", headers=headers, timeout=2)
+        response = requests.get("http://127.0.0.1:8000/api/models", headers=headers, timeout=2)
         if response.status_code == 200:
             return response.json().get("models", [])
-    except:
+    except Exception as e:
+        # st.error(f"Connection error: {e}") # Uncomment for debugging
         pass
     return []
 
@@ -144,30 +151,44 @@ def run_ocr_pipeline(uploaded_file):
         
         if uploaded_file.type == "application/pdf":
             # Convert PDF to images (requires poppler installed)
-            images = convert_from_bytes(uploaded_file.read())
-            for img in images:
-                text += pytesseract.image_to_string(img) + "\n"
+            try:
+                images = convert_from_bytes(uploaded_file.read())
+                for img in images:
+                    text += pytesseract.image_to_string(img) + "\n"
+            except Exception as pdf_error:
+                if "poppler" in str(pdf_error).lower() or "not found" in str(pdf_error).lower():
+                    st.error("❌ Poppler is not installed or not in PATH.")
+                    st.info("To fix PDF OCR: Download 'Release-xxx' from https://github.com/oschwartz10612/poppler-windows/releases, extract it, and add the `bin` folder to your System PATH.")
+                else:
+                    st.error(f"PDF Processing Error: {pdf_error}")
+                return None
         else:
             # Handle images
-            image = Image.open(uploaded_file)
-            text = pytesseract.image_to_string(image)
+            try:
+                image = Image.open(uploaded_file)
+                text = pytesseract.image_to_string(image)
+            except Exception as img_error:
+                st.error(f"Image Processing Error: {img_error}")
+                return None
         
         # Cleanup: Normalize whitespace
         cleaned_text = " ".join(text.split())
+        if not cleaned_text:
+            st.warning("OCR finished but no text was found.")
+            return None
+            
         return cleaned_text
+
     except pytesseract.TesseractNotFoundError:
-        st.error("Tesseract is not installed or not in PATH. Please install Tesseract-OCR.")
+        st.error("❌ Tesseract is not installed or not in PATH.")
+        st.info("To fix: Install Tesseract-OCR (https://github.com/UB-Mannheim/tesseract/wiki) and restart the app.")
         return None
     except Exception as e:
-        st.error(f"OCR Error: {e}")
-        if "poppler" in str(e).lower():
-             st.info("For PDFs, `poppler` must be installed and in your PATH.")
+        st.error(f"General OCR Error: {e}")
         return None
 
 def call_ollama_backend(prompt: str, conversation_id: str, model: str = "llama3.2") -> str:
     """Call FastAPI backend with Ollama integration or fallback to Mock."""
-    import requests
-    import json
     
     # API Key Configuration
     API_KEY = "77d9e9492a0645e197fe948e3d24da4c.tC3UJDhc1Ol_O3wjAZpoj_nP"
@@ -192,7 +213,7 @@ def call_ollama_backend(prompt: str, conversation_id: str, model: str = "llama3.
         }
 
         response = requests.post(
-            "http://localhost:8000/api/chat",
+            "http://127.0.0.1:8000/api/chat",
             headers=headers,
             json={
                 "message": prompt,
@@ -200,7 +221,7 @@ def call_ollama_backend(prompt: str, conversation_id: str, model: str = "llama3.
                 "model": model
             },
             stream=True,
-            timeout=120 # Increased timeout for model loading
+            timeout=300 # Increased timeout for model loading
         )
         
         if response.status_code == 200:
@@ -240,15 +261,6 @@ def call_ollama_backend(prompt: str, conversation_id: str, model: str = "llama3.
                     full_response.append(response.text)
             
             result = "".join(full_response)
-            if not result:
-                return (
-                    "⚠️ The backend returned an empty response.\n\n"
-                    "**Troubleshooting:**\n"
-                    "1. Ensure Ollama is running (`ollama serve`).\n"
-                    f"2. Ensure the model '{model}' is downloaded (`ollama pull {model}`).\n"
-                    "3. Check the terminal running `backend.py` for error logs."
-                )
-                
             return result
         
         # Handle HTTP Errors
@@ -259,7 +271,7 @@ def call_ollama_backend(prompt: str, conversation_id: str, model: str = "llama3.
         return f"⚠️ Backend Error ({response.status_code}): {error_msg}"
 
     except Exception as e:
-        return f"Backend unavailable ({str(e)}). Ensure backend.py is running on port 8000."
+        return f"Backend unavailable ({str(e)}). Ensure api.py is running on port 8000."
 
 # --- 3. CUSTOM CSS (VISUAL REPLICA) ---
 # Dynamic Font Size Logic
@@ -602,6 +614,67 @@ st.markdown(f"""
         margin-top: 4px;
     }}
 
+    /* OCR UPLOAD CARD */
+    .ocr-card {{
+        background: linear-gradient(135deg, #1e293b, #0f172a);
+        border: 1px solid #334155;
+        border-radius: 16px;
+        padding: 14px 16px;
+        box-shadow: 0 12px 28px -18px rgba(0,0,0,0.6);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        position: relative;
+        overflow: hidden;
+    }}
+    .ocr-card::after {{
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at 20% 20%, rgba(59,130,246,0.16), transparent 32%),
+                    radial-gradient(circle at 80% 0%, rgba(16,185,129,0.18), transparent 36%);
+        pointer-events: none;
+    }}
+    .ocr-chip {{
+        align-self: flex-start;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: rgba(59,130,246,0.16);
+        color: #bfdbfe;
+        font-size: 0.82rem;
+        border: 1px solid rgba(59,130,246,0.3);
+        letter-spacing: 0.04em;
+        animation: breathe 3s ease-in-out infinite;
+    }}
+    .ocr-title {{
+        font-weight: 600;
+        color: #e2e8f0;
+        font-size: 1rem;
+        margin: 2px 0;
+    }}
+    .ocr-hint {{
+        color: #94a3b8;
+        font-size: 0.9rem;
+        margin: 0;
+    }}
+    .ocr-footnote {{
+        color: #cbd5e1;
+        font-size: 0.82rem;
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+    }}
+    .ocr-footnote span {{
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }}
+    @keyframes breathe {{
+        0% {{ box-shadow: 0 0 0 0 rgba(59,130,246,0.18); }}
+        50% {{ box-shadow: 0 0 0 8px rgba(59,130,246,0.06); }}
+        100% {{ box-shadow: 0 0 0 0 rgba(59,130,246,0.0); }}
+    }}
+
     /* FLOATING INPUT BAR STYLING */
     /* We target the stChatInput container to make it float */
     div[data-testid="stChatInput"] {{
@@ -922,7 +995,20 @@ with st.container():
     with col_ocr:
         if OCR_AVAILABLE:
             with st.popover("📎 OCR", use_container_width=True, help="Upload Image/PDF for Text Extraction"):
-                st.markdown("### 📄 Extract Text")
+                st.markdown(
+                    """
+                    <div class="ocr-card">
+                        <div class="ocr-chip">OCR READY</div>
+                        <div class="ocr-title">Attach an image or PDF</div>
+                        <p class="ocr-hint">Extracted text is added to this chat so you can ask follow-ups instantly.</p>
+                        <div class="ocr-footnote">
+                            <span>📄 PNG · JPG · PDF</span>
+                            <span>⚡ Single file</span>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
                 uploaded_file = st.file_uploader(
                     "Upload", 
                     type=["png", "jpg", "jpeg", "pdf"], 
@@ -931,34 +1017,15 @@ with st.container():
                 )
                 
                 if uploaded_file:
-                    if st.button("Process", key=f"proc_{active_thread['id']}", use_container_width=True):
-                        with st.spinner("🔍 Scanning document..."):
+                    if st.button("Attach to Message", key=f"proc_{active_thread['id']}", use_container_width=True):
+                        with st.spinner("Processing document..."):
                             extracted_text = run_ocr_pipeline(uploaded_file)
                             if extracted_text:
-                                # Inject into chat
-                                active_thread["messages"].append({
-                                    "role": "system", 
-                                    "content": f"📷 Image Processed: {uploaded_file.name}"
-                                })
-                                
-                                ocr_prompt = (
-                                    "The following text was extracted using OCR from a user-uploaded document.\n"
-                                    "The text may contain formatting or recognition errors.\n\n"
-                                    f"Extracted Content:\n\"\"\"\n{extracted_text}\n\"\"\"\n"
-                                    "Please acknowledge receipt of this text and summarize it briefly."
-                                )
-                                
-                                active_thread["messages"].append({"role": "user", "content": ocr_prompt})
-                                
-                                # Trigger AI response
-                                selected_model = st.session_state.settings.get("model", "llama3.2")
-                                ai_response = call_ollama_backend(
-                                    prompt=ocr_prompt,
-                                    conversation_id=active_thread["id"],
-                                    model=selected_model
-                                )
-                                active_thread["messages"].append({"role": "assistant", "content": ai_response})
-                                st.rerun()
+                                st.session_state.ocr_context = {
+                                    "text": extracted_text,
+                                    "filename": uploaded_file.name
+                                }
+                                st.success(f"Attached {uploaded_file.name}! Type your message below.")
         else:
             st.caption("OCR Unavailable")
 
@@ -1001,44 +1068,96 @@ else:
             """, unsafe_allow_html=True)
         else:
             # Render AI Message (Left Aligned, Icon + Text)
-            st.markdown(f"""
-                <div class="ai-msg-container">
-                    <div class="ai-avatar">🤖</div>
-                    <div class="ai-text">
-                        <div style="font-weight: 600; margin-bottom: 4px; color: #3b82f6;">{st.session_state.settings['ai_name']}</div>
-                        {msg['content']}
+            # Refactored to use st.columns so Markdown/Code blocks render natively and don't overflow
+            with st.container():
+                col_avatar, col_text = st.columns([0.06, 0.94])
+                with col_avatar:
+                    st.markdown('<div class="ai-avatar">🤖</div>', unsafe_allow_html=True)
+                with col_text:
+                    st.markdown(f'<div style="font-weight: 600; margin-bottom: 4px; color: #3b82f6;">{st.session_state.settings["ai_name"]}</div>', unsafe_allow_html=True)
+                    st.markdown(msg['content'])
+                    st.markdown("""
                         <div style="display: flex; gap: 10px; margin-top: 10px; opacity: 0.5; font-size: 0.8rem;">
                             <span>📄 Copy</span> <span>🔄 Regenerate</span>
                         </div>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
+                    """, unsafe_allow_html=True)
 
 # --- 6. FLOATING INPUT ---
+
+# Display attachment indicator if file is staged
+if st.session_state.ocr_context["text"]:
+    st.markdown(f"""
+    <div style="
+        position: fixed; 
+        bottom: 90px; 
+        left: 50%; 
+        transform: translateX(-50%); 
+        background: #1e293b; 
+        border: 1px solid #3b82f6; 
+        padding: 8px 16px; 
+        border-radius: 20px; 
+        color: #bfdbfe; 
+        font-size: 0.9rem; 
+        z-index: 1001; 
+        display: flex; 
+        align-items: center; 
+        gap: 10px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+        <span>📎 Attached: <b>{st.session_state.ocr_context['filename']}</b></span>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    if st.button("❌ Clear Attachment", key="clear_attach"):
+        st.session_state.ocr_context = {"text": None, "filename": None}
+        st.rerun()
 
 # Uses st.chat_input, but styled via CSS above to look like a floating bar
 user_input = st.chat_input(placeholder=f"Message {st.session_state.settings['ai_name']}...")
 
 if user_input:
-    # 1. Add User Message
+    # 1. Prepare Prompt
+    final_prompt = user_input
+    
+    # 2. Handle Attachment
+    if st.session_state.ocr_context["text"]:
+        attachment_text = st.session_state.ocr_context["text"]
+        filename = st.session_state.ocr_context["filename"]
+        
+        # Add system note about attachment to history
+        active_thread["messages"].append({
+            "role": "system", 
+            "content": f"📎 Attached File: {filename}"
+        })
+        
+        # Construct augmented prompt for the AI
+        final_prompt = (
+            f"I have uploaded a document named '{filename}'. Here is its content:\n"
+            f"\"\"\"\n{attachment_text}\n\"\"\"\n\n"
+            f"Based on this document, please answer the following:\n{user_input}"
+        )
+        
+        # Clear attachment after sending
+        st.session_state.ocr_context = {"text": None, "filename": None}
+
+    # 3. Add User Message (Show the user's actual input)
     active_thread["messages"].append({"role": "user", "content": user_input})
     
-    # 2. Auto-Title if it's the first message
-    if len(active_thread["messages"]) == 1:
+    # 4. Auto-Title if it's the first message
+    if len(active_thread["messages"]) <= 2:
         rename_thread(active_thread["id"], generate_title(user_input))
 
-    # 3. Get selected model from session state
+    # 5. Get selected model from session state
     selected_model = st.session_state.settings.get("model", "llama3.2")
     
-    # 4. Call Backend
+    # 6. Call Backend
     with st.spinner(f"{st.session_state.settings['ai_name']} is thinking..."):
         ai_response = call_ollama_backend(
-            prompt=user_input,
+            prompt=final_prompt,
             conversation_id=active_thread["id"],
             model=selected_model
         )
     
-    # 4. Add AI Message
+    # 7. Add AI Message
     active_thread["messages"].append({"role": "assistant", "content": ai_response})
     
     # Rerun to update UI

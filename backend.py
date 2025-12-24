@@ -76,8 +76,8 @@ async def chat(request: Request, authorization: str = Header(None)):
     try:
         # 4. Call Ollama (Streamed)
         logger.info(f"Forwarding request to Ollama: {OLLAMA_API_URL}")
-        # Increased timeout to 120s because loading a model into RAM can take time
-        response = requests.post(OLLAMA_API_URL, json=ollama_payload, stream=True, timeout=120)
+        # Increased timeout to 300s because loading a model into RAM can take time
+        response = requests.post(OLLAMA_API_URL, json=ollama_payload, stream=True, timeout=300)
         
         # Check if Ollama rejected the request immediately (e.g. Model not found)
         if response.status_code != 200:
