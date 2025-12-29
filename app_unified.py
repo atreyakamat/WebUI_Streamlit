@@ -990,44 +990,88 @@ active_thread = get_active_thread()
 messages = active_thread["messages"]
 
 # OCR UPLOAD IN CHAT AREA (Top Right)
-with st.container():
-    col_header, col_ocr = st.columns([0.85, 0.15])
-    with col_ocr:
-        if OCR_AVAILABLE:
-            with st.popover("📎 OCR", use_container_width=True, help="Upload Image/PDF for Text Extraction"):
-                st.markdown(
-                    """
-                    <div class="ocr-card">
-                        <div class="ocr-chip">OCR READY</div>
-                        <div class="ocr-title">Attach an image or PDF</div>
-                        <p class="ocr-hint">Extracted text is added to this chat so you can ask follow-ups instantly.</p>
-                        <div class="ocr-footnote">
-                            <span>📄 PNG · JPG · PDF</span>
-                            <span>⚡ Single file</span>
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-                uploaded_file = st.file_uploader(
-                    "Upload", 
-                    type=["png", "jpg", "jpeg", "pdf"], 
-                    key=f"ocr_{active_thread['id']}",
-                    label_visibility="collapsed"
-                )
-                
-                if uploaded_file:
-                    if st.button("Attach to Message", key=f"proc_{active_thread['id']}", use_container_width=True):
-                        with st.spinner("Processing document..."):
-                            extracted_text = run_ocr_pipeline(uploaded_file)
-                            if extracted_text:
-                                st.session_state.ocr_context = {
-                                    "text": extracted_text,
-                                    "filename": uploaded_file.name
-                                }
-                                st.success(f"Attached {uploaded_file.name}! Type your message below.")
-        else:
-            st.caption("OCR Unavailable")
+if OCR_AVAILABLE:
+    # CSS for Floating Sticky OCR Button
+    st.markdown("""
+    <style>
+    /* 
+       Target the specific popover container. 
+       We use a more specific selector to ensure we grab the right element 
+       and force it out of the normal flow.
+    */
+    div[data-testid="stPopover"] {
+        position: fixed !important;
+        top: 3.5rem; /* Adjusted to sit below the header area */
+        right: 2rem;
+        z-index: 9999999; /* Extremely high z-index */
+        width: auto !important;
+        display: inline-block !important;
+    }
+    
+    /* Style the button itself to look like a floating pill */
+    div[data-testid="stPopover"] > button {
+        background: rgba(30, 41, 59, 0.9) !important; /* Dark slate background */
+        backdrop-filter: blur(8px);
+        border: 1px solid #475569 !important;
+        border-radius: 20px !important; /* Pill shape */
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+        color: #e2e8f0 !important;
+        font-weight: 600 !important;
+        padding: 0.4rem 1rem !important;
+        transition: all 0.2s ease !important;
+        text-transform: uppercase;
+        font-size: 0.8rem !important;
+        letter-spacing: 0.5px;
+    }
+    
+    div[data-testid="stPopover"] > button:hover {
+        background: #3b82f6 !important; /* Blue on hover */
+        border-color: #60a5fa !important;
+        color: #fff !important;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4) !important;
+    }
+    
+    /* Ensure the popover content (the dropdown) also appears correctly */
+    div[data-testid="stPopoverBody"] {
+        z-index: 9999999 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # We place the popover here, but the CSS above will rip it out of flow and pin it
+    with st.popover("📎 OCR", use_container_width=False, help="Upload Image/PDF for Text Extraction"):
+        st.markdown(
+            """
+            <div class="ocr-card">
+                <div class="ocr-chip">OCR READY</div>
+                <div class="ocr-title">Attach an image or PDF</div>
+                <p class="ocr-hint">Extracted text is added to this chat so you can ask follow-ups instantly.</p>
+                <div class="ocr-footnote">
+                    <span>📄 PNG · JPG · PDF</span>
+                    <span>⚡ Single file</span>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        uploaded_file = st.file_uploader(
+            "Upload", 
+            type=["png", "jpg", "jpeg", "pdf"], 
+            key=f"ocr_{active_thread['id']}",
+            label_visibility="collapsed"
+        )
+        
+        if uploaded_file:
+            if st.button("Attach to Message", key=f"proc_{active_thread['id']}", use_container_width=True):
+                with st.spinner("Processing document..."):
+                    extracted_text = run_ocr_pipeline(uploaded_file)
+                    if extracted_text:
+                        st.session_state.ocr_context = {
+                            "text": extracted_text,
+                            "filename": uploaded_file.name
+                        }
+                        st.success(f"Attached {uploaded_file.name}! Type your message below.")
 
 # A. WELCOME STATE (Empty Chat)
 if not messages:
